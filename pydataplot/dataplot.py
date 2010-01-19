@@ -32,7 +32,7 @@ def getVScale(lo, hi, pixels):
 	while y <= hi:
 		if y >= lo:
 			labelpos = pixels * (y - lo) / diff
-			scale.append((str(y), int(round(labelpos + font_height / 2)), int(round(labelpos)) ))
+			scale.append(('%4d' % y, int(round(labelpos + font_height / 2)), int(round(labelpos)) ))
 		
 		y += inc
 
@@ -138,10 +138,10 @@ class PlotConfig:
 			return self.yLabelPos() + self.yLabelLen()
 
 		def yScaleLen(self):
-			return 5 * self.refChar[1]
+			return 6 * self.refChar[0]
 
 		def yScaleBaselinePos(self):
-			return self.yScalePos() + self.refChar[1] / 2
+			return self.yScalePos() + self.refChar[0]
 
 		def yTicPos(self):
 			return self.yScalePos() + self.yScaleLen()
@@ -224,24 +224,23 @@ class Plotter:
 		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + cfg.dim.planeSize()[0], cfg.dim.xPlaneBorderPos()), labelCol)
 		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
 
-		# labels: hscale
+		# hscale
 		labels = genKmScale(x_max, cfg.dim.planeSize()[0])
 		for label in labels:
-			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[1], cfg.dim.xScaleBaselinePos()), label[0], labelCol)
+			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[2] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
 			src = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos())
 			dst = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
 			img.linex(src, dst, labelCol)
 
-		# labels: vscale
+		# vscale
 		labels = getVScale(y_min, y_max, cfg.dim.planeSize()[1])
 		for label in labels:
-#			img.stringx(cfg.font, (cfg.dim.yScalePos(), cfg.dim.planePos()[      cfg.dim.planePosition()[0] + label[1], cfg.dim.xScalePos())), label[0], labelCol)
+			img.stringx(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[2] + cfg.dim.refChar[1] / 2), label[0], labelCol)
 			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[2])
 			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[2])
 			img.linex(src, dst, labelCol)
 			
 		# graph
-
 		planePos = cfg.dim.planePos()
 		planeSize = cfg.dim.planeSize()
 
