@@ -7,7 +7,6 @@ def humanRoundUp(x):
 	digits = math.floor(math.log(x) / math.log(10))
 	mag = int(math.pow(10, digits))
 
-	print x, digits, mag
 	firstDigit = int(x / mag)
 
 	for i in [2,5,10]:
@@ -25,13 +24,11 @@ def genYScale(cfg, lo, hi, scalePixelLen):
 
 def genScale(lo, hi, scalePixelLen, maxLabels):
 	diff = hi - lo
-	inc = humanRoundUp(diff / maxLabels)
-
+	inc = humanRoundUp(max(diff / maxLabels, 1))
 	hlo = int(lo - lo % inc)
-
-	scale = []
-
 	x = hlo
+	
+	scale = []
 
 	while x <= hi:
 		if x >= lo:
@@ -238,17 +235,3 @@ class Plotter:
 
 		return img
 
-
-
-#cfg = PlotConfig()
-#
-#cfg.dim.type = cfg.dim.SIZE_PLANE
-#cfg.dim.width = 300
-#cfg.dim.height = 120
-
-#print cfg.dim.canvasSize()
-#print cfg.dim.planePos()
-#print cfg.dim.planeSize()
-#
-#print 'plane', cfg.dim.actualPlane()
-#print 'canvas', cfg.dim.actualCanvas()
