@@ -7,6 +7,7 @@ def humanRoundUp(x):
 	digits = math.floor(math.log(x) / math.log(10))
 	mag = int(math.pow(10, digits))
 
+	print x, digits, mag
 	firstDigit = int(x / mag)
 
 	for i in [2,5,10]:
@@ -14,52 +15,29 @@ def humanRoundUp(x):
 			return i * mag
 
 
-# TODO generalize with getKmScale
-def getVScale(lo, hi, pixels):
+def genXScale(cfg, lo, hi, scalePixelLen):
+	maxLabelWidth = gd.fontstrsize(cfg.font, '%d' % hi)[0]
+	return map(lambda x: (str(x[0]),x[1]), genScale(lo, hi, scalePixelLen, scalePixelLen / (maxLabelWidth * 2)))
+
+def genYScale(cfg, lo, hi, scalePixelLen):
+	fontHeight = cfg.dim.refChar[1]
+	return map(lambda x: ('%4d' % x[0],x[1]), genScale(lo, hi, scalePixelLen, scalePixelLen / fontHeight))
+
+def genScale(lo, hi, scalePixelLen, maxLabels):
 	diff = hi - lo
-
-	font_height = gd.fontstrsize(1, '0123456789')[1]
-
-	maxlabels = pixels / (font_height)
-	inc = humanRoundUp(diff / maxlabels)
+	inc = humanRoundUp(diff / maxLabels)
 
 	hlo = int(lo - lo % inc)
 
 	scale = []
 
-	y = hlo
+	x = hlo
 
-	while y <= hi:
-		if y >= lo:
-			labelpos = pixels * (y - lo) / diff
-			scale.append(('%4d' % y, int(round(labelpos + font_height / 2)), int(round(labelpos)) ))
-		
-		y += inc
-
-	return scale
-
-# TODO generalize with getVScale
-def genKmScale(kmf, pixels):
-
-	km = int(kmf)
-	# determine maxwidth of labels
-	maxw = gd.fontstrsize(1, str(km))[0]
-
-	# this is the hard maximum to ensure no overlap and visually acceptable padding (2 times label width)
-	maxlabels = pixels / (maxw * 2)
-
-	# choose a readable label increment
-	if maxlabels >= km:
-		dist = 1
-	else:
-		dist = humanRoundUp(kmf / maxlabels)
-
-	scale = []
-
-	for i in range(1, int(kmf / dist) + 1):
-		labelpos = pixels * i * dist / kmf
-		width = gd.fontstrsize(1, str(i*dist))[0]
-		scale.append((str(i*dist), int(round(labelpos - width / 2)), int(round(labelpos))))
+	while x <= hi:
+		if x >= lo:
+			pixelPos = scalePixelLen * (x - lo) / diff
+			scale.append((x, int(round(pixelPos))))
+		x += inc
 
 	return scale
 
@@ -225,19 +203,19 @@ class Plotter:
 		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
 
 		# hscale
-		labels = genKmScale(x_max, cfg.dim.planeSize()[0])
+		labels = genXScale(cfg, x_min, x_max, cfg.dim.planeSize()[0])
 		for label in labels:
-			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[2] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
-			src = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos())
-			dst = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
+			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[1] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
+			src = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos())
+			dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
 			img.linex(src, dst, labelCol)
 
 		# vscale
-		labels = getVScale(y_min, y_max, cfg.dim.planeSize()[1])
+		labels = genYScale(cfg, y_min, y_max, cfg.dim.planeSize()[1])
 		for label in labels:
-			img.stringx(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[2] + cfg.dim.refChar[1] / 2), label[0], labelCol)
-			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[2])
-			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[2])
+			img.stringx(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[1] + cfg.dim.refChar[1] / 2), label[0], labelCol)
+			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[1])
+			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[1])
 			img.linex(src, dst, labelCol)
 			
 		# graph
