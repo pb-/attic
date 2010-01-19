@@ -65,6 +65,7 @@ def genKmScale(kmf, pixels):
 
 class PlotConfig:
 	class Color:
+		background = (255,255,255)
 		label = (0,0,0)
 		grid = (128,128,128)
 		graph = (255,0,0)
@@ -80,38 +81,94 @@ class PlotConfig:
 
 		def __init__(self, cfg):
 			self.cfg = cfg
+			self.refChar = gd.fontstrsize(self.cfg.font, 'W')
 
-		def actualCanvas(self):
-			if self.type == self.SIZE_CANVAS:
-				return (self.width, self.height)
+		def padPos(self):
+			return 0
+
+		def padLen(self):
+			return self.cfg.outerPadding
+
+		def xLabelPos(self):
+			return self.padPos() + self.padLen()
+
+		def xLabelLen(self):
+			if self.cfg.label.x:
+				return 2 * self.refChar[1]
 			else:
-				po = self.planeOffset()
-				return (self.width + self.cfg.outerPadding + po[0], self.height + self.cfg.outerPadding + po[1])
+				return 0
 
-		def actualPlane(self):
+		def xLabelBaselinePos(self):
+			return self.xLabelPos() + int(self.refChar[1] * 1.5)
+
+		def xScalePos(self):
+			return self.xLabelPos() + self.xLabelLen()
+
+		def xScaleLen(self):
+			return int(1.5 * self.refChar[1])
+
+		def xScaleBaselinePos(self):
+			return self.xScalePos() + int(self.refChar[1] * 1.25)
+
+		def xTicPos(self):
+			return self.xScalePos() + self.xScaleLen()
+
+		def xTicLen(self):
+			return self.cfg.ticLen
+
+		def xPlaneBorderPos(self):
+			return self.xTicPos() + self.xTicLen()
+
+		def xPlaneBorderLen(self):
+			return 1
+
+		def yLabelPos(self):
+			return self.padPos() + self.padLen()
+
+		def yLabelLen(self):
+			if self.cfg.label.y:
+				return 2 * self.refChar[1]
+			else:
+				return 0
+
+		def yLabelBaselinePos(self):
+			return self.yLabelPos() + self.refChar[1] / 2
+
+		def yScalePos(self):
+			return self.yLabelPos() + self.yLabelLen()
+
+		def yScaleLen(self):
+			return 5 * self.refChar[1]
+
+		def yScaleBaselinePos(self):
+			return self.yScalePos() + self.refChar[1] / 2
+
+		def yTicPos(self):
+			return self.yScalePos() + self.yScaleLen()
+
+		def yTicLen(self):
+			return self.cfg.ticLen
+
+		def yPlaneBorderPos(self):
+			return self.yTicPos() + self.yTicLen()
+
+		def yPlaneBorderLen(self):
+			return 1
+
+		def planePos(self):
+			return (self.yPlaneBorderPos() + self.yPlaneBorderLen(), self.xPlaneBorderPos() + self.xPlaneBorderLen())
+
+		def planeSize(self):
 			if self.type == self.SIZE_PLANE:
 				return (self.width, self.height)
-			else:
-				po = self.planeOffset()
-				return (self.width - self.cfg.outerPadding - po[0], self.height - self.cfg.outerPadding - po[1])
 
-		def planeOffset(self):
-			# x:
-			# padding [1/2fh fh 1/2fh] 1/2fw 4fw 1/2fw ticlen 1
-			(fw2, fh2) = gd.fontstrsize(self.cfg.font, 'W')
-			(fw, fh) = (fw2 / 2 + fw2 % 2, fh2 / 2 + fh2 % 2)
+		def canvasSize(self):
+			if self.type == self.SIZE_PLANE:
+				pp = self.planePos()
+				ps = self.planeSize()
 
-			dx = self.cfg.outerPadding + fw + 4*fw2 + fw + self.cfg.ticLen + 1
-			if self.cfg.label.y:
-				dx += fh + fh2 + fh
-
-			# y:
-			# padding [1/2fh fh 1/2fh] 1/2fh fh 1/2fh ticlen 1
-			dy = self.cfg.outerPadding + fh + fh2 + fh + self.cfg.ticLen + 1
-			if self.cfg.label.x:
-				dy += fh + fh2 + fh
-
-			return (dx,dy)
+				return (pp[0] + ps[0] + self.cfg.outerPadding, pp[1] + ps[1] + self.cfg.outerPadding)
+			
 
 	class Label:
 		x = None
@@ -129,50 +186,23 @@ class PlotConfig:
 	def __init__(self):
 		self.dim = self.Dimensions(self)
 
-class Canvas:
-	width = None
-	height = None
 
-class Plane:
-	x = None
-	y = None
-	width = None
-	height = None
-
-class Geometry:
-	canvas = Canvas()
-	plane = Plane()
-
-class SimpleDataPlot:
-	CANVAS_SIZE = 1
-	PLANE_SIZE = 2
-
-	geometry = Geometry()
-
-	def __init__(self):
-		self.setSize(self.CANVAS_SIZE, (1000,250))
+# gd image wrapper with cartesian coordinates
+class imagex(gd.image):
+	def t(self, p):
+		return (p[0], self.size()[1] - 1 - p[1])
 	
-	def setSize(self, plane, size):
-		plane_offset = (50,30, -10, -10)
-		
-		self.geometry.plane.x = plane_offset[0]
-		self.geometry.plane.y = plane_offset[1]
+	def setPixelx(self, pos, col):
+		return self.setPixel(self.t(pos), col)
 
-		if plane == self.CANVAS_SIZE:
-			self.geometry.canvas.width = size[0]
-			self.geometry.canvas.height = size[1]
-			self.geometry.plane.width = size[0] - plane_offset[0] + plane_offset[2]
-			self.geometry.plane.height = size[1] - plane_offset[1] + plane_offset[3]
-		else:
-			self.geometry.plane.width = size[0]
-			self.geometry.plane.height = size[1]
-			self.geometry.canvas.width = size[0] + plane_offset[0] - plane_offset[2]
-			self.geometry.canvas.height = size[1] + plane_offset[1] - plane_offset[3]
+	def linex(self, src, dst, col):
+		return self.line(self.t(src), self.t(dst), col)
+	
+	def stringx(self, font, pos, str, col):
+		return self.string(font, self.t(pos), str, col)
 
-	def t(self, img, p):
-		return (p[0], img.size()[1] - 1 - p[1])
-
-	def plotPoints(self, datapoints, filename):
+class Plotter:
+	def plotPoints(self, datapoints, cfg):
 		if len(datapoints) < 2:
 			raise ValueError('Need at least two data points')
 
@@ -186,60 +216,50 @@ class SimpleDataPlot:
 			y_min = min(y_min, p[1])
 			y_max = max(y_max, p[1])
 
-#		x_min = int(round(x_min))
-#		x_max = int(round(x_max))
-#		y_min = int(round(y_min))
-#		y_max = int(round(y_max))
+		img = imagex(cfg.dim.canvasSize())
+		img.colorAllocate(cfg.color.background)
+		labelCol = img.colorAllocate(cfg.color.label)
 
-		img = gd.image((self.geometry.canvas.width, self.geometry.canvas.height))
-		img.colorAllocate((255,255,255))
-		label_col = img.colorAllocate((0,0,0))
-
-		# plane
-		img.line(self.t(img, (self.geometry.plane.x - 1, self.geometry.plane.y - 1)), self.t(img, (self.geometry.plane.x - 1 + self.geometry.plane.width, self.geometry.plane.y - 1)), label_col)
-		img.line(self.t(img, (self.geometry.plane.x - 1, self.geometry.plane.y - 1)), self.t(img, (self.geometry.plane.x - 1, self.geometry.plane.y - 1 + self.geometry.plane.height)), label_col)
-
+		# plane frame
+		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + cfg.dim.planeSize()[0], cfg.dim.xPlaneBorderPos()), labelCol)
+		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
 
 		# labels: hscale
-		labels = genKmScale(x_max, self.geometry.plane.width)
-		yoff = -(gd.fontstrsize(1, '1')[1] / 2 + 3)
+		labels = genKmScale(x_max, cfg.dim.planeSize()[0])
 		for label in labels:
-			img.string(1, self.t(img, (self.geometry.plane.x + label[1], self.geometry.plane.y + yoff)), label[0], label_col)
-			src = self.t(img, (self.geometry.plane.x + label[2], self.geometry.plane.y - 1))
-			dst = self.t(img, (self.geometry.plane.x + label[2], self.geometry.plane.y - 5))
-			img.line(src, dst, label_col)
+			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[1], cfg.dim.xScaleBaselinePos()), label[0], labelCol)
+			src = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos())
+			dst = (cfg.dim.planePos()[0] + label[2], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
+			img.linex(src, dst, labelCol)
 
 		# labels: vscale
-		labels = getVScale(y_min, y_max, self.geometry.plane.height)
-		xoff = -(gd.fontstrsize(1, '9999')[0] + 3)
+		labels = getVScale(y_min, y_max, cfg.dim.planeSize()[1])
 		for label in labels:
-			img.string(1, self.t(img, (self.geometry.plane.x + xoff, self.geometry.plane.y + label[1])), label[0], label_col)
-			src = self.t(img, (self.geometry.plane.x - 1, self.geometry.plane.y + label[2]))
-			dst = self.t(img, (self.geometry.plane.x - 5, self.geometry.plane.y + label[2]))
-			img.line(src, dst, label_col)
+#			img.stringx(cfg.font, (cfg.dim.yScalePos(), cfg.dim.planePos()[      cfg.dim.planePosition()[0] + label[1], cfg.dim.xScalePos())), label[0], labelCol)
+			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[2])
+			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[2])
+			img.linex(src, dst, labelCol)
 			
-
-
 		# graph
-		ink = img.colorAllocate((255,0,0))
+
+		planePos = cfg.dim.planePos()
+		planeSize = cfg.dim.planeSize()
+
+		ink = img.colorAllocate(cfg.color.graph)
 		for i in range(len(datapoints) - 1):
 			dp = datapoints[i]
-#			dp = (int(round(dp[0])), int(round(dp[1])))
-			pos_x = self.geometry.plane.x + (self.geometry.plane.width - 1) * (dp[0] - x_min) / (x_max - x_min)
-			pos_y = self.geometry.plane.y + (self.geometry.plane.height - 1) * (dp[1] - y_min) / (y_max - y_min)
-			src = (int(pos_x), int(img.size()[1] - pos_y - 1))
+			posX = planePos[0] + (planeSize[0] - 1) * (dp[0] - x_min) / (x_max - x_min)
+			posY = planePos[1] + (planeSize[1] - 1) * (dp[1] - y_min) / (y_max - y_min)
+			src = (int(posX), int(posY))
 
 			dp = datapoints[i+1]
-#			dp = (int(round(dp[0])), int(round(dp[1])))
-			pos_x = self.geometry.plane.x + (self.geometry.plane.width - 1) * (dp[0] - x_min) / (x_max - x_min)
-			pos_y = self.geometry.plane.y + (self.geometry.plane.height - 1) * (dp[1] - y_min) / (y_max - y_min)
-			dst = (int(pos_x), int(img.size()[1] - pos_y - 1))
+			posX = planePos[0] + (planeSize[0] - 1) * (dp[0] - x_min) / (x_max - x_min)
+			posY = planePos[1] + (planeSize[1] - 1) * (dp[1] - y_min) / (y_max - y_min)
+			dst = (int(posX), int(posY))
 
+			img.linex(src, dst, ink)
 
-			img.line(src,dst,ink)
-#			img.setPixel((pos_x, img.size()[1] - pos_y - 1), ink)
-
-		img.writePng(filename)
+		return img
 
 
 
@@ -248,6 +268,10 @@ class SimpleDataPlot:
 #cfg.dim.type = cfg.dim.SIZE_PLANE
 #cfg.dim.width = 300
 #cfg.dim.height = 120
+
+#print cfg.dim.canvasSize()
+#print cfg.dim.planePos()
+#print cfg.dim.planeSize()
 #
 #print 'plane', cfg.dim.actualPlane()
 #print 'canvas', cfg.dim.actualCanvas()
