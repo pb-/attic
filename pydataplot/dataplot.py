@@ -44,7 +44,7 @@ class PlotConfig:
 		label = (0,0,0)
 		grid = (128,128,128)
 		graph = (255,0,0)
-		area = (128,0,0)
+		area = (255,230,230)
 
 	class Dimensions:
 		SIZE_PLANE = 1
@@ -175,6 +175,9 @@ class imagex(gd.image):
 	
 	def stringx(self, font, pos, str, col):
 		return self.string(font, self.t(pos), str, col)
+	
+	def stringUpx(self, font, pos, str, col):
+		return self.stringUp(font, self.t(pos), str, col)
 
 class Plotter:
 	def plotPoints(self, datapoints, cfg):
@@ -215,10 +218,38 @@ class Plotter:
 			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[1])
 			img.linex(src, dst, labelCol)
 			
-		# graph
 		planePos = cfg.dim.planePos()
 		planeSize = cfg.dim.planeSize()
 
+		# labels
+		if cfg.label.x:
+			mx = planePos[0] + planeSize[0] / 2
+			mxl = mx - gd.fontstrsize(cfg.font, cfg.label.x)[0] / 2
+			img.stringx(cfg.font, (mxl, cfg.dim.xLabelBaselinePos()), cfg.label.x, labelCol)
+
+		if cfg.label.y:
+			my = planePos[1] + planeSize[1] / 2
+			myb = my - gd.fontstrsize(cfg.font, cfg.label.y)[0] / 2
+			img.stringUpx(cfg.font, (cfg.dim.yLabelBaselinePos(), myb), cfg.label.y, labelCol)
+
+		# area
+		if cfg.renderArea:
+			datapoints.insert(0, (x_min,y_min))
+			datapoints.append((x_max,y_min))
+
+			poly = map(lambda p: (
+				int(planePos[0] + (planeSize[0] - 1) * (p[0] - x_min) / (x_max - x_min)),
+				img.size()[1] - 1 - int(planePos[1] + (planeSize[1] - 1) * (p[1] - y_min) / (y_max - y_min))
+			), datapoints)
+
+			datapoints.pop(0)
+			datapoints.pop()
+
+			areaCol = img.colorAllocate(cfg.color.area)
+			img.filledPolygon(poly, areaCol)
+
+
+		# graph
 		ink = img.colorAllocate(cfg.color.graph)
 		for i in range(len(datapoints) - 1):
 			dp = datapoints[i]

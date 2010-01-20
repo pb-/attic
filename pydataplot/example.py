@@ -16,5 +16,19 @@ for x in range(w):
 
 # plot it
 p = dataplot.Plotter()
-img = p.plotPoints(data, dataplot.PlotConfig())
+cfg = dataplot.PlotConfig()
+img = p.plotPoints(data, cfg)
 img.writePng('plot.png')
+
+# plot if differently!
+cfg.color.background = (250,250,250)
+cfg.color.graph = (0,0,255)
+cfg.color.area = (230,230,255)
+cfg.renderArea = True
+cfg.label.x = 'x'
+cfg.label.y = 'funky(x)'
+cfg.ticLen = 2
+cfg.dim.width = 650
+cfg.dim.height = 130
+img = p.plotPoints(data, cfg)
+img.writePng('plot2.png')
