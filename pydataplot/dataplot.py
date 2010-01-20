@@ -68,21 +68,21 @@ class PlotConfig:
 
 		def xLabelLen(self):
 			if self.cfg.label.x:
-				return 2 * self.refChar[1]
+				return self.refChar[1]
 			else:
 				return 0
 
 		def xLabelBaselinePos(self):
-			return self.xLabelPos() + int(self.refChar[1] * 1.5)
+			return self.xLabelPos() + int(self.refChar[1])
 
 		def xScalePos(self):
 			return self.xLabelPos() + self.xLabelLen()
 
 		def xScaleLen(self):
-			return int(1.5 * self.refChar[1])
+			return int(self.refChar[1])
 
 		def xScaleBaselinePos(self):
-			return self.xScalePos() + int(self.refChar[1] * 1.25)
+			return self.xScalePos() + int(self.refChar[1])
 
 		def xTicPos(self):
 			return self.xScalePos() + self.xScaleLen()
@@ -101,21 +101,21 @@ class PlotConfig:
 
 		def yLabelLen(self):
 			if self.cfg.label.y:
-				return 2 * self.refChar[1]
+				return self.refChar[1]
 			else:
 				return 0
 
 		def yLabelBaselinePos(self):
-			return self.yLabelPos() + self.refChar[1] / 2
+			return self.yLabelPos()
 
 		def yScalePos(self):
 			return self.yLabelPos() + self.yLabelLen()
 
 		def yScaleLen(self):
-			return 6 * self.refChar[0]
+			return 5 * self.refChar[0]
 
 		def yScaleBaselinePos(self):
-			return self.yScalePos() + self.refChar[0]
+			return self.yScalePos() + self.refChar[0] / 2
 
 		def yTicPos(self):
 			return self.yScalePos() + self.yScaleLen()

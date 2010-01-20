@@ -21,6 +21,7 @@ img = p.plotPoints(data, cfg)
 img.writePng('plot.png')
 
 # plot if differently!
+cfg.outerPadding = 6
 cfg.color.background = (250,250,250)
 cfg.color.graph = (0,0,255)
 cfg.color.area = (230,230,255)
