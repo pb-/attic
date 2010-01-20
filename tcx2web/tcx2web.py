@@ -130,7 +130,8 @@ def htmlCourse(course):
 
 	html += '<div id="map"></div>'
 
-	html += '<ul id="graphs"><li><h3>Altitude</h3><img src="altitude.png" alt="Altitude"></li><li><h3>Speed</h3><img src="speed.png" alt="Speed"></li><li><h3>Cadence</h3><img src="cadence.png" alt="Cadence"></li></ul>'
+#	html += '<ul id="graphs"><li><h3>Altitude</h3><img src="altitude.png" alt="Altitude"></li><li><h3>Speed</h3><img src="speed.png" alt="Speed"></li><li><h3>Cadence</h3><img src="cadence.png" alt="Cadence"></li></ul>'
+	html += '<ul id="graphs"><li><img src="altitude.png" alt="Altitude"></li><li><img src="speed.png" alt="Speed"></li><li><img src="cadence.png" alt="Cadence"></li></ul>'
 
 	html += '</body></html>'
 	return html
@@ -177,7 +178,12 @@ def writeCourse(course):
 			deltaDist = course.trackpoints[pi+1].dist - course.trackpoints[pi].dist
 			deltaTime = (course.trackpoints[pi+1].time - course.trackpoints[pi].time).seconds
 
-			samplesSpeed.append((position / 1000, 3.6 * deltaDist / deltaTime))
+			v = deltaDist / deltaTime
+
+			if not v > course.vmax + 1:
+				samplesSpeed.append((position / 1000, 3.6 * v))
+			else:
+				print 'warning: dropped bogus speed sample %.2f km/h > %.2f km/h' % (3.6 * v, 3.6 * course.vmax)
 	
 
 	# render plots
