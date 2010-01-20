@@ -2,6 +2,7 @@ import xml.dom.minidom
 import datetime
 import os
 import errno
+import pickle
 
 import sys
 sys.path.append('/home/dp/code/python/pydataplot')
@@ -85,7 +86,7 @@ def htmlCourse(course):
      margin: auto;
 	}
     #map {
-     width: 400px;
+     width: 500px;
 	 height: 400px;
 	 float: right;
 	 border: 1px solid black;
@@ -225,6 +226,13 @@ def writeCourse(course):
 	# create index file
 	f = open(os.path.join(dirname, 'index.html'), 'w')
 	f.write(htmlCourse(course))
+	f.close()
+
+
+	# save metadata
+	course.trackpoints = None
+	f = open(os.path.join(dirname, 'meta.pickle'), 'w')
+	pickle.dump(course, f)
 	f.close()
 
 
