@@ -25,6 +25,7 @@ cfg.color.background = (250,250,250)
 cfg.color.graph = (0,0,255)
 cfg.color.area = (230,230,255)
 cfg.renderArea = True
+cfg.grid = True
 cfg.label.x = 'x'
 cfg.label.y = 'funky(x)'
 cfg.ticLen = 2

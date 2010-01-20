@@ -42,7 +42,7 @@ class PlotConfig:
 	class Color:
 		background = (255,255,255)
 		label = (0,0,0)
-		grid = (128,128,128)
+		grid = (192,192,192)
 		graph = (255,0,0)
 		area = (255,230,230)
 
@@ -162,23 +162,6 @@ class PlotConfig:
 		self.dim = self.Dimensions(self)
 
 
-# gd image wrapper with cartesian coordinates
-class imagex(gd.image):
-	def t(self, p):
-		return (p[0], self.size()[1] - 1 - p[1])
-	
-	def setPixelx(self, pos, col):
-		return self.setPixel(self.t(pos), col)
-
-	def linex(self, src, dst, col):
-		return self.line(self.t(src), self.t(dst), col)
-	
-	def stringx(self, font, pos, str, col):
-		return self.string(font, self.t(pos), str, col)
-	
-	def stringUpx(self, font, pos, str, col):
-		return self.stringUp(font, self.t(pos), str, col)
-
 class Plotter:
 	def plotPoints(self, datapoints, cfg):
 		if len(datapoints) < 2:
@@ -194,29 +177,19 @@ class Plotter:
 			y_min = min(y_min, p[1])
 			y_max = max(y_max, p[1])
 
-		img = imagex(cfg.dim.canvasSize())
+		img = gd.image(cfg.dim.canvasSize())
+		img.origin((0,img.size()[1]), 1, -1)
+
 		img.colorAllocate(cfg.color.background)
 		labelCol = img.colorAllocate(cfg.color.label)
+		gridCol = img.colorAllocate(cfg.color.grid)
+
+		img.setStyle((gridCol, gridCol, gridCol, gd.gdTransparent, gd.gdTransparent))
 
 		# plane frame
-		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + cfg.dim.planeSize()[0], cfg.dim.xPlaneBorderPos()), labelCol)
-		img.linex((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
+		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + cfg.dim.planeSize()[0], cfg.dim.xPlaneBorderPos()), labelCol)
+		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
 
-		# hscale
-		labels = genXScale(cfg, x_min, x_max, cfg.dim.planeSize()[0])
-		for label in labels:
-			img.stringx(cfg.font, (cfg.dim.planePos()[0] + label[1] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
-			src = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos())
-			dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
-			img.linex(src, dst, labelCol)
-
-		# vscale
-		labels = genYScale(cfg, y_min, y_max, cfg.dim.planeSize()[1])
-		for label in labels:
-			img.stringx(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[1] + cfg.dim.refChar[1] / 2), label[0], labelCol)
-			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[1])
-			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[1])
-			img.linex(src, dst, labelCol)
 			
 		planePos = cfg.dim.planePos()
 		planeSize = cfg.dim.planeSize()
@@ -225,12 +198,12 @@ class Plotter:
 		if cfg.label.x:
 			mx = planePos[0] + planeSize[0] / 2
 			mxl = mx - gd.fontstrsize(cfg.font, cfg.label.x)[0] / 2
-			img.stringx(cfg.font, (mxl, cfg.dim.xLabelBaselinePos()), cfg.label.x, labelCol)
+			img.string(cfg.font, (mxl, cfg.dim.xLabelBaselinePos()), cfg.label.x, labelCol)
 
 		if cfg.label.y:
 			my = planePos[1] + planeSize[1] / 2
 			myb = my - gd.fontstrsize(cfg.font, cfg.label.y)[0] / 2
-			img.stringUpx(cfg.font, (cfg.dim.yLabelBaselinePos(), myb), cfg.label.y, labelCol)
+			img.stringUp(cfg.font, (cfg.dim.yLabelBaselinePos(), myb), cfg.label.y, labelCol)
 
 		# area
 		if cfg.renderArea:
@@ -239,7 +212,7 @@ class Plotter:
 
 			poly = map(lambda p: (
 				int(planePos[0] + (planeSize[0] - 1) * (p[0] - x_min) / (x_max - x_min)),
-				img.size()[1] - 1 - int(planePos[1] + (planeSize[1] - 1) * (p[1] - y_min) / (y_max - y_min))
+				int(planePos[1] + (planeSize[1] - 1) * (p[1] - y_min) / (y_max - y_min))
 			), datapoints)
 
 			datapoints.pop(0)
@@ -247,6 +220,32 @@ class Plotter:
 
 			areaCol = img.colorAllocate(cfg.color.area)
 			img.filledPolygon(poly, areaCol)
+		
+		# hscale & grid
+		labels = genXScale(cfg, x_min, x_max, cfg.dim.planeSize()[0])
+		for label in labels:
+			img.string(cfg.font, (cfg.dim.planePos()[0] + label[1] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
+			src = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos())
+			dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
+			img.line(src, dst, labelCol)
+
+			if cfg.grid:
+				src = (cfg.dim.planePos()[0] + label[1], cfg.dim.planePos()[1])
+				dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.planePos()[1] + cfg.dim.planeSize()[1] - 1)
+				img.line(src, dst, gd.gdStyled)
+
+		# vscale & grid
+		labels = genYScale(cfg, y_min, y_max, cfg.dim.planeSize()[1])
+		for label in labels:
+			img.string(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[1] + cfg.dim.refChar[1] / 2), label[0], labelCol)
+			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[1])
+			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[1])
+			img.line(src, dst, labelCol)
+			
+			if cfg.grid:
+				src = (cfg.dim.planePos()[0], cfg.dim.planePos()[1] + label[1])
+				dst = (cfg.dim.planePos()[0] + cfg.dim.planeSize()[0] - 1, cfg.dim.planePos()[1] + label[1])
+				img.line(src, dst, gd.gdStyled)
 
 
 		# graph
@@ -262,7 +261,7 @@ class Plotter:
 			posY = planePos[1] + (planeSize[1] - 1) * (dp[1] - y_min) / (y_max - y_min)
 			dst = (int(posX), int(posY))
 
-			img.linex(src, dst, ink)
+			img.line(src, dst, ink)
 
 		return img
 
