@@ -13,7 +13,6 @@ def humanRoundUp(x):
 		if firstDigit < i:
 			return i * mag
 
-
 def genXScale(cfg, lo, hi, scalePixelLen):
 	maxLabelWidth = gd.fontstrsize(cfg.font, '%d' % hi)[0]
 	return map(lambda x: (str(x[0]),x[1]), genScale(lo, hi, scalePixelLen, scalePixelLen / (maxLabelWidth * 2)))
@@ -185,14 +184,16 @@ class Plotter:
 		gridCol = img.colorAllocate(cfg.color.grid)
 
 		img.setStyle((gridCol, gridCol, gridCol, gd.gdTransparent, gd.gdTransparent))
-
-		# plane frame
-		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + cfg.dim.planeSize()[0], cfg.dim.xPlaneBorderPos()), labelCol)
-		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + cfg.dim.planeSize()[1]), labelCol)
-
-			
+		
 		planePos = cfg.dim.planePos()
 		planeSize = cfg.dim.planeSize()
+
+		# plane frame
+		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos() + planeSize[0], cfg.dim.xPlaneBorderPos()), labelCol)
+		img.line((cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos()), (cfg.dim.yPlaneBorderPos(), cfg.dim.xPlaneBorderPos() + planeSize[1]), labelCol)
+
+		img.line((cfg.dim.yPlaneBorderPos(), planePos[1] + planeSize[1]),(cfg.dim.yPlaneBorderPos() + planeSize[0] + 1, planePos[1] + planeSize[1]), gridCol)
+		img.line((planePos[0] + planeSize[0],cfg.dim.xPlaneBorderPos()),(planePos[0] + planeSize[0],cfg.dim.xPlaneBorderPos() + planeSize[1] + 1), gridCol)
 
 		# labels
 		if cfg.label.x:
@@ -222,29 +223,29 @@ class Plotter:
 			img.filledPolygon(poly, areaCol)
 		
 		# hscale & grid
-		labels = genXScale(cfg, x_min, x_max, cfg.dim.planeSize()[0])
+		labels = genXScale(cfg, x_min, x_max, planeSize[0])
 		for label in labels:
-			img.string(cfg.font, (cfg.dim.planePos()[0] + label[1] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
-			src = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos())
-			dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
+			img.string(cfg.font, (planePos[0] + label[1] - gd.fontstrsize(cfg.font, label[0])[0] / 2, cfg.dim.xScaleBaselinePos()), label[0], labelCol)
+			src = (planePos[0] + label[1], cfg.dim.xTicPos())
+			dst = (planePos[0] + label[1], cfg.dim.xTicPos() + cfg.dim.xTicLen() - 1)
 			img.line(src, dst, labelCol)
 
 			if cfg.grid:
-				src = (cfg.dim.planePos()[0] + label[1], cfg.dim.planePos()[1])
-				dst = (cfg.dim.planePos()[0] + label[1], cfg.dim.planePos()[1] + cfg.dim.planeSize()[1] - 1)
+				src = (planePos[0] + label[1], planePos[1])
+				dst = (planePos[0] + label[1], planePos[1] + planeSize[1] - 1)
 				img.line(src, dst, gd.gdStyled)
 
 		# vscale & grid
-		labels = genYScale(cfg, y_min, y_max, cfg.dim.planeSize()[1])
+		labels = genYScale(cfg, y_min, y_max, planeSize[1])
 		for label in labels:
-			img.string(cfg.font, (cfg.dim.yScaleBaselinePos(), cfg.dim.planePos()[1] + label[1] + cfg.dim.refChar[1] / 2), label[0], labelCol)
-			src = (cfg.dim.yTicPos(), cfg.dim.planePos()[1] + label[1])
-			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, cfg.dim.planePos()[1] + label[1])
+			img.string(cfg.font, (cfg.dim.yScaleBaselinePos(), planePos[1] + label[1] + cfg.dim.refChar[1] / 2), label[0], labelCol)
+			src = (cfg.dim.yTicPos(), planePos[1] + label[1])
+			dst = (cfg.dim.yTicPos() + cfg.dim.yTicLen() - 1, planePos[1] + label[1])
 			img.line(src, dst, labelCol)
 			
 			if cfg.grid:
-				src = (cfg.dim.planePos()[0], cfg.dim.planePos()[1] + label[1])
-				dst = (cfg.dim.planePos()[0] + cfg.dim.planeSize()[0] - 1, cfg.dim.planePos()[1] + label[1])
+				src = (planePos[0], planePos[1] + label[1])
+				dst = (planePos[0] + planeSize[0] - 1, planePos[1] + label[1])
 				img.line(src, dst, gd.gdStyled)
 
 
