@@ -177,7 +177,7 @@ class Plotter:
 			y_max = max(y_max, p[1])
 
 		img = gd.image(cfg.dim.canvasSize())
-		img.origin((0,img.size()[1]), 1, -1)
+		img.origin((0,img.size()[1] - 1), 1, -1)
 
 		img.colorAllocate(cfg.color.background)
 		labelCol = img.colorAllocate(cfg.color.label)
