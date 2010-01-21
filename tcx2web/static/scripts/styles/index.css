@@ -1,0 +1,32 @@
+body {
+	width: 900px;
+	margin: auto;
+	font-family: sans-serif;
+}
+
+a img {
+	border: none;
+}
+
+.course {
+	border: 1px solid #666;
+	float: left;
+	margin: 1em;
+	background-color: #f8f8f8;
+}
+
+.course img {
+	margin: .5em;
+}
+
+.course p {
+	margin: 0;
+	padding: 3px;
+	font-size: 80%;
+	text-align: center;
+	background-color: #666;
+}
+
+.course a {
+	color: white;
+}

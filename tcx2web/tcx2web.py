@@ -1,8 +1,12 @@
-import xml.dom.minidom
+import xml.sax
+import xml.sax.handler
 import datetime
 import os
 import errno
 import pickle
+
+import dp
+import gpx
 
 import sys
 sys.path.append('/home/dp/code/python/pydataplot')
@@ -32,87 +36,14 @@ def htmlCourse(course):
    <title>Ride &quot;%s&quot;</title>
    <script src="http://www.openlayers.org/api/OpenLayers.js"></script>
    <script src="http://www.openstreetmap.org/openlayers/OpenStreetMap.js"></script>
-   <script type="text/javascript">
-/*		var lat=50.2309
-		var lon=8.879
-		var zoom=13*/
-
-		var map;
-		var lgpx;
-
-		function dataReady() {
-			map.zoomToExtent(lgpx.getDataExtent());
-		}
-
-		function init() {
-
-			map = new OpenLayers.Map ("map", {
-				controls:[
-					new OpenLayers.Control.Navigation(),
-					new OpenLayers.Control.PanZoomBar(),
-					new OpenLayers.Control.LayerSwitcher()
-					],
-				maxExtent: new OpenLayers.Bounds(-20037508.34,-20037508.34,20037508.34,20037508.34),
-				maxResolution: 156543.0399,
-				numZoomLevels: 19,
-				units: 'm',
-				projection: new OpenLayers.Projection("EPSG:900913"),
-				displayProjection: new OpenLayers.Projection("EPSG:4326")
-			} );
-			layerMapnik = new OpenLayers.Layer.OSM.Mapnik("Mapnik");
-			map.addLayer(layerMapnik);
-			layerCycleMap = new OpenLayers.Layer.OSM.CycleMap("CycleMap");
-			map.addLayer(layerCycleMap);
-
-                        lgpx = new OpenLayers.Layer.GML("Track", "light.gpx", {
-                            format: OpenLayers.Format.GPX,
-                            style: {strokeColor: "#9600ff", strokeWidth: 5, strokeOpacity: 0.5},
-                            projection: new OpenLayers.Projection("EPSG:4326"),
-							eventListeners: { 'loadend': dataReady }
-                        });
-                        map.addLayer(lgpx);
-
-			lgpx.loadGML()
-//			map.zoomToExtent(lgpx.getDataExtent());
- 
-		//	var lonLat = new OpenLayers.LonLat(lon, lat).transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject());
-		//	map.setCenter (lonLat, zoom);
-		}
-
-   </script>
-   <style type="text/css">
-    body {
-     width: 900px;
-     margin: auto;
-	}
-    #map {
-     width: 500px;
-	 height: 400px;
-	 float: right;
-	 border: 1px solid black;
-    }
-    #meta {
-     float: left;
-	 width: 20em;
-    }
-	#graphs {
-	 padding-top: 3em;
-	 clear: both;
-	 list-style: none;
-	}
-	#graphs li h3 {
-	 font-size: 90%%;
-	 text-align: center;
-	 padding: 0;
-	 margin: 5px;
-    }
-   </style>
+   <script src="../scripts/map.js"></script>
+   <link rel="stylesheet" href="../styles/ride.css" type="text/css" media="screen">
   </head>
  <body onload="init();">""" % course.id
 
  	html += '<h1>%s</h1>' % course.id
 
-
+	html += '<p><a href="../">All rides</a></p>'
 	html += '<table id="meta">'
 	html += '<tr><td>Start</td><td>%s</td></tr>' % str(course.start)
 	html += '<tr><td>End</td><td>%s</td></tr>' % str(course.end)
@@ -121,9 +52,12 @@ def htmlCourse(course):
 	html += '<tr><td>Distance</td><td>%.1f km</td></tr>' % (course.dist / 1000)
 	html += '<tr><td>Total ascent</td><td>%d m</td></tr>' % (course.asc)
 	html += '<tr><td>v<sub>avg</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.dist / dur)
-	html += '<tr><td>v<sub>max</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.vmax)
-	html += '<tr><td>Calories</td><td>%d</td></tr>' % course.calories
-	html += '<tr><td>Cadence<sub>avg</sub></td><td>%d</td></tr>' % course.cadence
+	if course.vmax:
+		html += '<tr><td>v<sub>max</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.vmax)
+	if course.calories > 0:
+		html += '<tr><td>Calories</td><td>%d</td></tr>' % course.calories
+	if course.cadence:
+		html += '<tr><td>Cadence<sub>avg</sub></td><td>%d</td></tr>' % course.cadence
 	html += '<tr><td></td><td></td></tr>'
 	html += '<tr><td>GPX download</td><td><a href="light.gpx">light.gpx</a></td></tr>'
 	html += '</table>'
@@ -135,6 +69,42 @@ def htmlCourse(course):
 
 	html += '</body></html>'
 	return html
+
+def writeIndex():
+
+	courses = []
+	dir = os.listdir('.')
+	for file in dir:
+		if os.path.isdir(file):
+			mf = os.path.join(file, 'meta.pickle')
+			if os.path.exists(mf):
+				f = open(mf)
+				c = pickle.load(f)
+				c.dname = file
+				courses.append(c)
+				f.close()
+	
+	index = open('index.html', 'w')
+
+	index.write('<!doctype html>\n')
+	index.write('<html>')
+	index.write(' <head>')
+	index.write('  <title>Index of rides</title>')
+	index.write('  <link rel="stylesheet" href="styles/index.css" type="text/css" media="screen">')
+	index.write(' </head>')
+	index.write(' <body>')
+	index.write('  <h1>Index of rides</h1>')
+
+	courses.sort(key=lambda x: x.start, reverse=True)
+
+	for c in courses:
+		index.write('<div class="course"><a href="%s/"><img src="%s/icon.png"><p>%dkm / %dm<br>%s</p></a></div>' % (c.dname, c.dname, round(c.dist / 1000), c.asc, c.start.strftime('%Y-%m-%d')))
+
+	index.write(' </body>')
+	index.write('</html>')
+
+	index.close()
+
 
 def writeCourse(course):
 	dirname = '%d-%02d-%02d--%02d%02d' % (course.start.year, course.start.month, course.start.day, course.start.hour, course.start.minute)
@@ -169,10 +139,11 @@ def writeCourse(course):
 
 		samplesAlt.append((position / 1000, course.trackpoints[pi].alt))
 
-		if course.trackpoints[pi].cad:
-			samplesCad.append((position / 1000, course.trackpoints[pi].cad))
-		else:
-			samplesCad.append((position / 1000, 0))
+		if course.cadence:
+			if course.trackpoints[pi].cad:
+				samplesCad.append((position / 1000, course.trackpoints[pi].cad))
+			else:
+				samplesCad.append((position / 1000, 0))
 
 		if (pi+1) < len(course.trackpoints):
 			deltaDist = course.trackpoints[pi+1].dist - course.trackpoints[pi].dist
@@ -180,11 +151,10 @@ def writeCourse(course):
 
 			v = deltaDist / deltaTime
 
-			if not v > course.vmax + 1:
+			if not course.vmax or not v > course.vmax + 1:
 				samplesSpeed.append((position / 1000, 3.6 * v))
 			else:
 				print 'warning: dropped bogus speed sample %.2f km/h > %.2f km/h' % (3.6 * v, 3.6 * course.vmax)
-	
 
 	# render plots
 	plotter = dataplot.Plotter()
@@ -210,11 +180,12 @@ def writeCourse(course):
 	plot = plotter.plotPoints(samplesSpeed, cfg)
 	plot.writePng(os.path.join(dirname, 'speed.png'))
 	
-	cfg.label.y = 'Cadence [rpm]'
-	cfg.color.graph = (0xb8,0x4f,0)
-	cfg.color.area = (0xeb,0xcd,0xb7)
-	plot = plotter.plotPoints(samplesCad, cfg)
-	plot.writePng(os.path.join(dirname, 'cadence.png'))
+	if course.cadence:
+		cfg.label.y = 'Cadence [rpm]'
+		cfg.color.graph = (0xb8,0x4f,0)
+		cfg.color.area = (0xeb,0xcd,0xb7)
+		plot = plotter.plotPoints(samplesCad, cfg)
+		plot.writePng(os.path.join(dirname, 'cadence.png'))
 
 
 	# gpx file with all points (invalid)
@@ -227,7 +198,15 @@ def writeCourse(course):
 	f.close()
 
 	# lightweight gpx file (valid)   gpsbabel -i gpx -f full.gpx -x simplify,error=0.005k -o gpx -F light.gpx
-	os.system('gpsbabel -i gpx -f %s -x simplify,error=0.005k -o gpx -F %s' % (os.path.join(dirname, 'full.gpx'), os.path.join(dirname, 'light.gpx')))
+	light = os.path.join(dirname, 'light.gpx')
+	full = os.path.join(dirname, 'full.gpx')
+	os.system('gpsbabel -i gpx -f %s -x simplify,error=0.005k -o gpx -F %s' % (full, light))
+
+	# create gpx icon
+	icon = os.path.join(dirname, 'icon.png')
+	gpxIcon = gpx.GpxIcon()
+	gpxIcon.parse(light)
+	gpxIcon.render(96).writePng(icon)
 
 	# create index file
 	f = open(os.path.join(dirname, 'index.html'), 'w')
@@ -240,6 +219,24 @@ def writeCourse(course):
 	f = open(os.path.join(dirname, 'meta.pickle'), 'w')
 	pickle.dump(course, f)
 	f.close()
+
+def calcTotalAscent(trackpoints):
+	asc = 0
+
+	points = []
+
+	for p in trackpoints:
+		if p.dist and p.alt:
+			points.append((p.dist, p.alt))
+
+	points = dp.simplify_points(points, 2.5)
+
+	for i in range(len(points) - 1):
+		diff = points[i+1][1] - points[i][1]
+		if diff > 0:
+			asc += diff
+
+	return asc
 
 
 class Trackpoint:
@@ -283,81 +280,129 @@ def get_text(nodes):
 
 	return rc.strip()
 
-class TcxParser:
 
-	def get_text(self, nodes):
-		rc = ''
+class TcxParser(xml.sax.handler.ContentHandler):
+	def __init__(self):
+		self.handlers = dict()
+		for attr in dir(self):
+			if attr.startswith('handle') and (attr.endswith('Start') or attr.endswith('End')):
+				if callable(getattr(self, attr)):
+					self.handlers[attr] = getattr(self, attr)
 
-		for node in nodes:
-			if node.nodeType == node.TEXT_NODE:
-				rc += node.data
-
-		return rc.strip()
-
-	def parse(self, data):
-		self.dom = xml.dom.minidom.parse(data)
-
-		acts = self.dom.getElementsByTagName('Activities')[0]
-		act = acts.getElementsByTagName('Activity')[0]
-		id = self.get_text(act.getElementsByTagName('Id')[0].childNodes)
-
-		lap = act.getElementsByTagName('Lap')[0]
-
-		start = unknown_date_format(lap.attributes.item(0).value)
-
-		time = float(self.get_text(lap.getElementsByTagName('TotalTimeSeconds')[0].childNodes))
-		dist = float(self.get_text(lap.getElementsByTagName('DistanceMeters')[0].childNodes))
-		vmax = float(self.get_text(lap.getElementsByTagName('MaximumSpeed')[0].childNodes))
-		calories = int(self.get_text(lap.getElementsByTagName('Calories')[0].childNodes))
-		cad = int(self.get_text(lap.getElementsByTagName('Cadence')[0].childNodes))
-
-		course = Course(id, start, time, dist, vmax, calories, cad)
-
-		tracks = lap.getElementsByTagName('Track')
-		for track in tracks:
-			trackpoints = track.getElementsByTagName('Trackpoint')
-
-			for tp in trackpoints:
-				time = unknown_date_format(self.get_text(tp.getElementsByTagName('Time')[0].childNodes))
-
-				positions = tp.getElementsByTagName('Position')
-				if len(positions) > 0:
-					pos = positions[0]
-					lat = float(simpleVal(pos, 'LatitudeDegrees'))
-					lon = float(simpleVal(pos, 'LongitudeDegrees'))
-				else:
-					lat = None
-					lon = None
-
-				alt = float(simpleVal(tp, 'AltitudeMeters'))
-				dist = float(simpleVal(tp, 'DistanceMeters'))
-
-				cadences = tp.getElementsByTagName('Cadence')
-				if len(cadences) > 0:
-					cadence = int(simpleVal(tp, 'Cadence'))
-				else:
-					cadence = None
-
-				t = Trackpoint(time, lat, lon, alt, dist, cadence, 0)
-
-				course.trackpoints.append(t)
-				course.end = time
-				if len(course.trackpoints) > 1:
-					if course.trackpoints[-1].alt > course.trackpoints[-2].alt:
-						course.asc += course.trackpoints[-1].alt - course.trackpoints[-2].alt
-
-
-		return course
 	
-
-
+	def parse(self, filename):
+		xml.sax.parse(filename, self)
+		return self.course
 			
+	def startElement(self, element, attrs):
+		name = 'handle' + element + 'Start'
 
-		
+		try:
+			self.handlers[name](attrs)
+		except KeyError:
+			pass
+
+		self.text = ''
+
+	def endElement(self, element):
+		name = 'handle' + element + 'End'
+
+		try:
+			self.handlers[name]()
+		except KeyError:
+			pass
+	
+	def characters(self, content):
+		self.text += content
+
+
+	########## element handlers ##############
+	def handleTrainingCenterDatabaseStart(self, attrs):
+		self.time = 0
+		self.dist = 0
+		self.vmax = None
+		self.calories = 0
+		self.cad = None
+		self.start = None
+
+		self.inTp = False
+		self.firstLap = False
+		self.trackpoints = []
+	
+	def handleIdEnd(self):
+		self.id = self.text.strip()
+	
+	# Lap
+	def handleLapStart(self, attrs):
+		if self.firstLap:
+			print '!!! warning: multiple laps, average cadence information will be bogus'
+		else:
+			self.start = unknown_date_format(attrs.getValue('StartTime'))
+			self.firstLap = True
+
+	def handleTotalTimeSecondsEnd(self):
+		self.time += float(self.text.strip())
+	
+	def handleDistanceMetersEnd(self):
+		if self.inTp:
+			self.tpdist = float(self.text.strip())
+		else:
+			self.dist += float(self.text.strip())
+	
+	def handleCaloriesEnd(self):
+		self.calories += int(self.text.strip())
+	
+	def handleMaximumSpeedEnd(self):
+		self.vmax = max(self.vmax, float(self.text.strip()))
+	
+	def handleCadenceEnd(self):
+		if self.inTp:
+			self.tpcad = int(self.text.strip())
+		else:
+			self.cad = int(self.text.strip())
+
+	def handleTrainingCenterDatabaseEnd(self):
+		if not self.start:
+			self.start = self.trackpoints[0].time
+
+		self.course = Course(self.id, self.start, self.time, self.dist, self.vmax, self.calories, self.cad)
+
+		self.course.trackpoints = self.trackpoints
+		self.course.end = self.course.trackpoints[-1].time
+
+		self.course.asc = calcTotalAscent(self.course.trackpoints)
+
+	# Trackpoint
+	def handleTrackpointStart(self, attrs):
+		self.tptime = None
+		self.lat = None
+		self.lon = None
+		self.alt = None
+		self.tpdist = None
+		self.tpcad = None
+		self.hr = None
+
+		self.inTp = True
+	
+	def handleTimeEnd(self):
+		self.tptime = unknown_date_format(self.text.strip())
+	
+	def handleLatitudeDegreesEnd(self):
+		self.lat = float(self.text.strip())
+	
+	def handleLongitudeDegreesEnd(self):
+		self.lon = float(self.text.strip())
+	
+	def handleAltitudeMetersEnd(self):
+		self.alt = float(self.text.strip())
+	
+	def handleTrackpointEnd(self):
+		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, 0))
+
+		self.inTp = False
 
 p = TcxParser()
 
 course = p.parse(sys.argv[1])
 writeCourse(course)
-
-
+writeIndex()
