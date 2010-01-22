@@ -6,25 +6,12 @@ import errno
 import pickle
 
 import dp
+import dataplot
 import gpx
 
-import sys
-sys.path.append('/home/dp/code/python/pydataplot')
-import dataplot
-
-
-def unknown_date_format(s):
-	# %Y-%m-%dT%H:%M:%SZ
-	# 2010-01-16T13:09:29Z
-	# 01234567890123456789
-
-#	class utc(datetime.tzinfo):
-#		def utcoffset(self, dt):
-#			return datetime.timedelta()
-
+def parseIsoDateFormat(s):
+	# FIXME this is utc, convert to localtime
 	u = datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
-#	t = datetime.datetime(u.year, u.month, u.day, u.hour, u.minute, u.second, 0, utc())
-
 	return u
 
 def htmlCourse(course):
@@ -188,7 +175,7 @@ def writeCourse(course):
 		plot.writePng(os.path.join(dirname, 'cadence.png'))
 
 
-	# gpx file with all points (invalid)
+	# gpx file with all points
 	f = open(os.path.join(dirname, 'full.gpx'), 'w')
 	f.write('<gpx><trk><trkseg>')
 	for p in course.trackpoints:
@@ -212,7 +199,6 @@ def writeCourse(course):
 	f = open(os.path.join(dirname, 'index.html'), 'w')
 	f.write(htmlCourse(course))
 	f.close()
-
 
 	# save metadata
 	course.trackpoints = None
@@ -337,7 +323,7 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		if self.firstLap:
 			print '!!! warning: multiple laps, average cadence information will be bogus'
 		else:
-			self.start = unknown_date_format(attrs.getValue('StartTime'))
+			self.start = parseIsoDateFormat(attrs.getValue('StartTime'))
 			self.firstLap = True
 
 	def handleTotalTimeSecondsEnd(self):
@@ -385,7 +371,7 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		self.inTp = True
 	
 	def handleTimeEnd(self):
-		self.tptime = unknown_date_format(self.text.strip())
+		self.tptime = parseIsoDateFormat(self.text.strip())
 	
 	def handleLatitudeDegreesEnd(self):
 		self.lat = float(self.text.strip())
