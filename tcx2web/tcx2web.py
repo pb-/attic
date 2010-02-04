@@ -252,21 +252,6 @@ class Course:
 		self.end = None
 
 
-def firstChild(node, name):
-	return node.getElementsByTagName(name)[0]
-
-def simpleVal(node, name):
-	return get_text(firstChild(node,name).childNodes)
-
-def get_text(nodes):
-	rc = ''
-
-	for node in nodes:
-		if node.nodeType == node.TEXT_NODE:
-			rc += node.data
-
-	return rc.strip()
-
 
 class TcxParser(xml.sax.handler.ContentHandler):
 	def __init__(self):
