@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+	<head>
+		<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+		<title>Ride %(id)s</title>
+		<script src="http://www.openlayers.org/api/OpenLayers.js"></script>
+		<script src="http://www.openstreetmap.org/openlayers/OpenStreetMap.js"></script>
+		<script src="../scripts/map.js"></script>
+		<link rel="stylesheet" href="../styles/ride.css" type="text/css" media="screen">
+	</head>
+	<body onload="init();">
+		<h1>%(id)s</h1>
+
+		<p><a href="../">All rides</a></p>
+
+		<table id="meta">
+			<tr><td>Start</td><td>%(start)s</td></tr>
+			<tr><td>End</td><td>%(end)s</td></tr>
+			<tr><td>Duration</td><td>%(duration)s</td></tr>
+			<tr><td>Distance</td><td>%(distance).1f km</td></tr>
+			<tr><td>Total climb</td><td>%(climb)d m</td></tr>
+			<tr><td>v<sub>avg</sub></td><td>%(vavg).1f km/h</td></tr>
+%(vmax)s
+%(calories)s
+%(cadence)s
+			<tr><td></td><td></td></tr>
+			<tr><td>GPX download</td><td><a href="light.gpx">light.gpx</a></td></tr>
+		</table>
+
+		<div id="map"></div>
+
+		<ul id="graphs">
+			<li><img src="altitude.png" alt="Altitude"></li>
+			<li><img src="speed.png" alt="Speed"></li>
+			<li><img src="cadence.png" alt="Cadence"></li>
+		</ul>
+	</body>
+</html>

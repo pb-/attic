@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import sys
 import os
 import datetime
@@ -12,55 +11,57 @@ import dp
 import dataplot
 import gpx
 
+cache = {}
+
 def parseIsoDateFormat(s):
 	# FIXME this is utc, convert to localtime
 	u = datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
 	return u
 
-def htmlCourse(course):
-	html = """
-<!doctype html>
-<html>
-  <head>
-   <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-   <title>Ride &quot;%s&quot;</title>
-   <script src="http://www.openlayers.org/api/OpenLayers.js"></script>
-   <script src="http://www.openstreetmap.org/openlayers/OpenStreetMap.js"></script>
-   <script src="../scripts/map.js"></script>
-   <link rel="stylesheet" href="../styles/ride.css" type="text/css" media="screen">
-  </head>
- <body onload="init();">""" % course.id
+def getTemplate(datadir, name, data):
+	filename = os.path.join(datadir, 'templates', name + '.html')
 
- 	html += '<h1>%s</h1>' % course.id
+	if not filename in cache:
+		f = open(filename)
+		cache[filename] = f.read()
+		f.close()
 
-	html += '<p><a href="../">All rides</a></p>'
-	html += '<table id="meta">'
-	html += '<tr><td>Start</td><td>%s</td></tr>' % str(course.start)
-	html += '<tr><td>End</td><td>%s</td></tr>' % str(course.end)
+	return cache[filename] % data
+
+
+def htmlCourse(datadir, course):
+
 	dur = (course.end - course.start).seconds
-	html += '<tr><td>Duration</td><td>%02d:%02d:%02d</td></tr>' % (dur / 3600, dur % 3600 / 60, dur % 60)
-	html += '<tr><td>Distance</td><td>%.1f km</td></tr>' % (course.dist / 1000)
-	html += '<tr><td>Total ascent</td><td>%d m</td></tr>' % (course.asc)
-	html += '<tr><td>v<sub>avg</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.dist / dur)
+
+	data = {
+		'id': course.id,
+		'start': str(course.start),
+		'end': str(course.end),
+		'duration': '%02d:%02d:%02d' % (dur / 3600, dur % 3600 / 60, dur % 60),
+		'distance': course.dist / 1000,
+		'climb': course.asc,
+		'vavg': (3.6 * course.dist / dur),
+	}
+
 	if course.vmax:
-		html += '<tr><td>v<sub>max</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.vmax)
-	if course.calories > 0:
-		html += '<tr><td>Calories</td><td>%d</td></tr>' % course.calories
+		data['vmax'] = '<tr><td>v<sub>max</sub></td><td>%.1f km/h</td></tr>' % (3.6 * course.vmax)
+	else:
+		data['vmax'] = ''
+
+	if course.calories:
+		data['calories'] = '<tr><td>Calories</td><td>%d</td></tr>' % course.calories
+	else:
+		data['calories'] = ''
+	
 	if course.cadence:
-		html += '<tr><td>Cadence<sub>avg</sub></td><td>%d</td></tr>' % course.cadence
-	html += '<tr><td></td><td></td></tr>'
-	html += '<tr><td>GPX download</td><td><a href="light.gpx">light.gpx</a></td></tr>'
-	html += '</table>'
+		data['cadence'] = '<tr><td>Cadence<sub>avg</sub></td><td>%d</td></tr>' % course.cadence
+	else:
+		data['cadence'] = ''
+	
+	return getTemplate(datadir, 'course', data)
 
-	html += '<div id="map"></div>'
 
-#	html += '<ul id="graphs"><li><h3>Altitude</h3><img src="altitude.png" alt="Altitude"></li><li><h3>Speed</h3><img src="speed.png" alt="Speed"></li><li><h3>Cadence</h3><img src="cadence.png" alt="Cadence"></li></ul>'
-	html += '<ul id="graphs"><li><img src="altitude.png" alt="Altitude"></li><li><img src="speed.png" alt="Speed"></li><li><img src="cadence.png" alt="Cadence"></li></ul>'
-
-	html += '</body></html>'
-	return html
-
-def writeIndex():
+def writeIndex(datadir):
 
 	courses = []
 	dir = os.listdir('.')
@@ -73,30 +74,28 @@ def writeIndex():
 				c.dname = file
 				courses.append(c)
 				f.close()
-	
+
 	index = open('index.html', 'w')
 
-	index.write('<!doctype html>\n')
-	index.write('<html>')
-	index.write(' <head>')
-	index.write('  <title>Index of rides</title>')
-	index.write('  <link rel="stylesheet" href="styles/index.css" type="text/css" media="screen">')
-	index.write(' </head>')
-	index.write(' <body>')
-	index.write('  <h1>Index of rides</h1>')
-
 	courses.sort(key=lambda x: x.start, reverse=True)
+	rides = ''
 
 	for c in courses:
-		index.write('<div class="course"><a href="%s/"><img src="%s/icon.png"><p>%dkm / %dm<br>%s</p></a></div>' % (c.dname, c.dname, round(c.dist / 1000), c.asc, c.start.strftime('%Y-%m-%d')))
+		rides += getTemplate(datadir, 'index-course', {
+			'dir': c.dname,
+			'dist': round(c.dist/1000),
+			'climb': c.asc,
+			'date': c.start.strftime('%Y-%m-%d'),
+		})
 
-	index.write(' </body>')
-	index.write('</html>')
+	index.write(getTemplate(datadir, 'index', {
+		'rides': rides,
+	}))
 
 	index.close()
 
 
-def writeCourse(course):
+def writeCourse(datadir, course):
 	dirname = '%d-%02d-%02d--%02d%02d' % (course.start.year, course.start.month, course.start.day, course.start.hour, course.start.minute)
 
 	try:
@@ -200,7 +199,7 @@ def writeCourse(course):
 
 	# create index file
 	f = open(os.path.join(dirname, 'index.html'), 'w')
-	f.write(htmlCourse(course))
+	f.write(htmlCourse(datadir, course))
 	f.close()
 
 	# save metadata
@@ -375,8 +374,10 @@ class TcxParser(xml.sax.handler.ContentHandler):
 
 		self.inTp = False
 
+datadir = os.path.dirname(sys.argv[0])
+
 p = TcxParser()
 
 course = p.parse(sys.argv[1])
-writeCourse(course)
-writeIndex()
+writeCourse(datadir, course)
+writeIndex(datadir)
