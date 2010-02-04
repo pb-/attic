@@ -33,4 +33,8 @@ a img {
 
 hr {
 	clear: both;
+	border: none;
+	height: 1px;
+	background-color: #666;
+	color: #666;
 }
