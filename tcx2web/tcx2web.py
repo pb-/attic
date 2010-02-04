@@ -3,6 +3,7 @@ import sys
 import os
 import datetime
 import errno
+import shutil
 import pickle
 import xml.sax
 import xml.sax.handler
@@ -374,6 +375,8 @@ class TcxParser(xml.sax.handler.ContentHandler):
 
 		self.inTp = False
 
+
+
 datadir = os.path.dirname(sys.argv[0])
 
 p = TcxParser()
@@ -381,3 +384,7 @@ p = TcxParser()
 course = p.parse(sys.argv[1])
 writeCourse(datadir, course)
 writeIndex(datadir)
+
+shutil.copy(os.path.join(datadir, 'static', 'styles', 'index.css'), 'styles')
+shutil.copy(os.path.join(datadir, 'static', 'styles', 'ride.css'), 'styles')
+shutil.copy(os.path.join(datadir, 'static', 'scripts', 'map.js'), 'scripts')

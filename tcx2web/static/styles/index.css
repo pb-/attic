@@ -30,3 +30,7 @@ a img {
 .course a {
 	color: white;
 }
+
+hr {
+	clear: both;
+}
