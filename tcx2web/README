@@ -1,0 +1,11 @@
+INSTALL
+=======
+
+dataplot.py <http://github.com/dp-/pydataplot> is required for plotting, place it in this directory.
+
+
+
+USAGE
+=====
+
+python tcx2web.py mytcxfile.tcx
