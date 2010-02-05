@@ -1,11 +1,19 @@
+tcx2web -- create web reports from Garmin TCX history files
+
+
 INSTALL
 =======
-
 dataplot.py <http://github.com/dp-/pydataplot> is required for plotting, place it in this directory.
-
 
 
 USAGE
 =====
 
-python tcx2web.py mytcxfile.tcx
+$ python tcx2web.py mytcxfile.tcx
+
+Generates a web report in the current directory.
+
+
+NOTES
+=====
+This program has been tested on TCX history files produced by a Garmin Edge 705 device. It should work on similar models; if you experience any bugs, please contact me and provide the raw TCX file.
