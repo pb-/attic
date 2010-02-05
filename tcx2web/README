@@ -1,9 +1,10 @@
 tcx2web -- create web reports from Garmin TCX history files
 
 
-INSTALL
-=======
-dataplot.py <http://github.com/dp-/pydataplot> is required for plotting, place it in this directory.
+INSTALL & REQUIREMENTS
+======================
+	* python bindings for libgd
+	* dataplot.py <http://github.com/dp-/pydataplot>, place it in this directory
 
 
 USAGE
@@ -11,7 +12,7 @@ USAGE
 
 $ python tcx2web.py mytcxfile.tcx
 
-Generates a web report in the current directory.
+Generates a web report in the current directory (overwrites index.html).
 
 
 NOTES
