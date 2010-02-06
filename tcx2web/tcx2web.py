@@ -5,6 +5,7 @@ import datetime
 import errno
 import shutil
 import pickle
+import time
 import xml.sax
 import xml.sax.handler
 
@@ -14,10 +15,69 @@ import gpx
 
 cache = {}
 
+########## http://docs.python.org/library/datetime.html#tzinfo-objects #############
+
+ZERO = datetime.timedelta(0)
+HOUR = datetime.timedelta(hours=1)
+
+STDOFFSET = datetime.timedelta(seconds = -time.timezone)
+if time.daylight:
+    DSTOFFSET = datetime.timedelta(seconds = -time.altzone)
+else:
+    DSTOFFSET = STDOFFSET
+
+DSTDIFF = DSTOFFSET - STDOFFSET
+
+class LocalTimezone(datetime.tzinfo):
+    def utcoffset(self, dt):
+        if self._isdst(dt):
+            return DSTOFFSET
+        else:
+            return STDOFFSET
+
+    def dst(self, dt):
+        if self._isdst(dt):
+            return DSTDIFF
+        else:
+            return ZERO
+
+    def _isdst(self, dt):
+        tt = (dt.year, dt.month, dt.day,
+              dt.hour, dt.minute, dt.second,
+              dt.weekday(), 0, -1)
+        stamp = time.mktime(tt)
+        tt = time.localtime(stamp)
+        return tt.tm_isdst > 0
+
+class UTC(datetime.tzinfo):
+    def utcoffset(self, dt):
+        return ZERO
+
+    def dst(self, dt):
+        return ZERO
+
+utc = UTC()
+localTimezone = LocalTimezone()
+
+########## http://docs.python.org/library/datetime.html#tzinfo-objects #############
+
+
+
+
 def parseIsoDateFormat(s):
-	# FIXME this is utc, convert to localtime
 	u = datetime.datetime.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
+	u = u.replace(tzinfo=utc).astimezone(localTimezone)
+
 	return u
+
+def mkdirp(dirname):
+	try:
+		os.mkdir(dirname)
+	except OSError as e:
+		if e.errno == errno.EEXIST:
+			pass
+		else:
+			raise
 
 def getTemplate(datadir, name, data):
 	filename = os.path.join(datadir, 'templates', name + '.html')
@@ -36,8 +96,9 @@ def htmlCourse(datadir, course):
 
 	data = {
 		'id': course.id,
-		'start': str(course.start),
-		'end': str(course.end),
+		'date': course.start.strftime('%B %d, %Y'),
+		'start': course.start.strftime('%H:%M'),
+		'end': course.end.strftime('%H:%M'),
 		'duration': '%02d:%02d:%02d' % (dur / 3600, dur % 3600 / 60, dur % 60),
 		'distance': course.dist / 1000,
 		'climb': course.asc,
@@ -99,13 +160,7 @@ def writeIndex(datadir):
 def writeCourse(datadir, course):
 	dirname = '%d-%02d-%02d--%02d%02d' % (course.start.year, course.start.month, course.start.day, course.start.hour, course.start.minute)
 
-	try:
-		os.mkdir(dirname)
-	except OSError as e:
-		if e.errno == errno.EEXIST:
-			pass
-		else:
-			raise
+	mkdirp(dirname)
 	
 	# prepare data samples for plot
 	width = 800
@@ -385,6 +440,8 @@ course = p.parse(sys.argv[1])
 writeCourse(datadir, course)
 writeIndex(datadir)
 
+mkdirp('styles')
+mkdirp('scripts')
 shutil.copy(os.path.join(datadir, 'static', 'styles', 'index.css'), 'styles')
 shutil.copy(os.path.join(datadir, 'static', 'styles', 'ride.css'), 'styles')
 shutil.copy(os.path.join(datadir, 'static', 'scripts', 'map.js'), 'scripts')
