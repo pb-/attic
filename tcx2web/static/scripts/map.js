@@ -1,6 +1,8 @@
 var map;
 var lgpx;
 
+var marker;
+
 function dataReady() {
 	map.zoomToExtent(lgpx.getDataExtent());
 }
@@ -25,6 +27,8 @@ function initMap() {
 	map.addLayer(layerMapnik);
 	layerCycleMap = new OpenLayers.Layer.OSM.CycleMap("Cycle Map");
 	map.addLayer(layerCycleMap);
+	layerMarkers = new OpenLayers.Layer.Markers("Markers");
+	map.addLayer(layerMarkers);
 
 	lgpx = new OpenLayers.Layer.GML("Track", "light.gpx", {
 		format: OpenLayers.Format.GPX,
@@ -37,15 +41,30 @@ function initMap() {
 
 	lgpx.loadGML();
 
+	var size = new OpenLayers.Size(32,32);
+	var offset = new OpenLayers.Pixel(-size.w/2, -size.h/2);
+	var icon = new OpenLayers.Icon('../images/crosshair.png',size,offset);
+	marker = new OpenLayers.Marker(new OpenLayers.LonLat(positionIndex[0][1], positionIndex[0][0]).transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()),icon);
+	layerMarkers.addMarker(marker);
+
 	$('graphAltitude').addEvent('mousemove', graphMouseMove);
 	$('graphSpeed').addEvent('mousemove', graphMouseMove);
 	$('graphCadence').addEvent('mousemove', graphMouseMove);
 }
 
 function graphMouseMove(event) {
-	alert('move!');
+	var p = $('graphAltitude').getPosition();
+	var x = event.page.x - p.x
+
+	/* HACKHACKHACK */
+	x -= 59
+
+	if( x >= 0 && x < positionIndex.length ) {
+		marker.moveTo(map.getLayerPxFromLonLat(new OpenLayers.LonLat(positionIndex[x][1], positionIndex[x][0]).transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject())));
+	}
 }
 
 window.addEvent('domready', function() {
 	initMap();
 });
+

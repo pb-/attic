@@ -171,6 +171,7 @@ def writeCourse(datadir, course):
 	samplesAlt = []
 	samplesSpeed = []
 	samplesCad = []
+	positions = []
 
 	for i in range(width):
 		position = i * interval + interval/2
@@ -200,6 +201,16 @@ def writeCourse(datadir, course):
 				samplesSpeed.append((position / 1000, 3.6 * v))
 			else:
 				print 'warning: dropped bogus speed sample %.2f km/h > %.2f km/h' % (3.6 * v, 3.6 * course.vmax)
+
+			# position index, linear interpolation between two trackpoints
+			if course.trackpoints[pi].lat and course.trackpoints[pi].lon and course.trackpoints[pi+1].lat and course.trackpoints[pi+1].lon:
+				vecPos = (position - course.trackpoints[pi].dist) / deltaDist
+				lat = course.trackpoints[pi].lat + (course.trackpoints[pi+1].lat - course.trackpoints[pi].lat) * vecPos
+				lon = course.trackpoints[pi].lon + (course.trackpoints[pi+1].lon - course.trackpoints[pi].lon) * vecPos
+				positions.append((lat,lon))
+			else:
+				positions.append((0,0))
+
 
 	# render plots
 	plotter = dataplot.Plotter()
@@ -231,6 +242,14 @@ def writeCourse(datadir, course):
 		cfg.color.area = (0xeb,0xcd,0xb7)
 		plot = plotter.plotPoints(samplesCad, cfg)
 		plot.writePng(os.path.join(dirname, 'cadence.png'))
+
+	# position index
+	f = open(os.path.join(dirname, 'pindex.js'), 'w')
+	f.write('var positionIndex = [')
+	for p in positions:
+		f.write('[%.4f,%.4f],' % (p[0],p[1]))
+	f.write('];')
+	f.close()
 
 
 	# gpx file with all points
@@ -442,7 +461,9 @@ writeIndex(datadir)
 
 mkdirp('styles')
 mkdirp('scripts')
+mkdirp('images')
 shutil.copy(os.path.join(datadir, 'static', 'styles', 'index.css'), 'styles')
 shutil.copy(os.path.join(datadir, 'static', 'styles', 'ride.css'), 'styles')
 shutil.copy(os.path.join(datadir, 'static', 'scripts', 'map.js'), 'scripts')
 shutil.copy(os.path.join(datadir, 'static', 'scripts', 'mootools-1.2.4-core.js'), 'scripts')
+shutil.copy(os.path.join(datadir, 'static', 'images', 'crosshair.png'), 'images')
