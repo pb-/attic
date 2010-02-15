@@ -142,6 +142,10 @@ def writeIndex(datadir):
 	courses.sort(key=lambda x: x.start, reverse=True)
 	rides = ''
 
+	totalDist = 0
+	totalClimb = 0
+	totalTime = datetime.timedelta(0)
+
 	for c in courses:
 		rides += getTemplate(datadir, 'index-course', {
 			'dir': c.dname,
@@ -150,8 +154,16 @@ def writeIndex(datadir):
 			'date': c.start.strftime('%Y-%m-%d'),
 		})
 
+		totalDist += c.dist
+		totalClimb += c.asc
+		totalTime += c.end - c.start
+
+
 	index.write(getTemplate(datadir, 'index', {
 		'rides': rides,
+		'totalDist': round(totalDist/1000),
+		'totalClimb': totalClimb,
+		'totalTime': (totalTime.seconds / 3600),
 	}))
 
 	index.close()
