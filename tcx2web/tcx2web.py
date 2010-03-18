@@ -163,7 +163,7 @@ def writeIndex(datadir):
 		'rides': rides,
 		'totalDist': round(totalDist/1000),
 		'totalClimb': totalClimb,
-		'totalTime': (totalTime.seconds / 3600),
+		'totalTime': (totalTime.days * 24 + totalTime.seconds / 3600),
 	}))
 
 	index.close()
