@@ -12,7 +12,7 @@ USAGE
 
 $ python tcx2web.py mytcxfile.tcx
 
-Generates a web report in the current directory (overwrites index.html).
+Generates a web report in the current directory (updates index.html). Repeat this procedure for each TCX history file to add them to the index.
 
 
 NOTES
