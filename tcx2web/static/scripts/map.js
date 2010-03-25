@@ -47,13 +47,25 @@ function initMap() {
 	marker = new OpenLayers.Marker(new OpenLayers.LonLat(positionIndex[0][1], positionIndex[0][0]).transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()),icon);
 	layerMarkers.addMarker(marker);
 
-	$('graphAltitude').addEvent('mousemove', graphMouseMove);
-	$('graphSpeed').addEvent('mousemove', graphMouseMove);
-	$('graphCadence').addEvent('mousemove', graphMouseMove);
+	$('graphAltitude').addEvent('mousemove', graphAltitudeMouseMove);
+	$('graphSpeed').addEvent('mousemove', graphSpeedMouseMove);
+	$('graphCadence').addEvent('mousemove', graphCadenceMouseMove);
 }
 
-function graphMouseMove(event) {
-	var p = $('graphAltitude').getPosition();
+function graphAltitudeMouseMove(event) {
+	graphMouseMove(event, 'graphAltitude');
+}
+
+function graphSpeedMouseMove(event) {
+	graphMouseMove(event, 'graphSpeed');
+}
+
+function graphCadenceMouseMove(event) {
+	graphMouseMove(event, 'graphCadence');
+}
+
+function graphMouseMove(event, graph) {
+	var p = $(graph).getPosition();
 	var x = event.page.x - p.x
 
 	/* HACKHACKHACK */
