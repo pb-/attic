@@ -18,13 +18,13 @@ cache = {}
 
 colors = {
 	'red': '#d9182b',
+	'orange': '#e8991a',
+	'lightgreen': '#79af3d',
+	'darkgreen': '#037746',
 	'lightblue': '#0099d1',
 	'darkblue': '#1c449c',
-	'darkgreen': '#037746',
-	'lightgreen': '#79af3d',
-	'orange': '#e8991a',
-	'darkviolet': '#6b2b8c',
 	'lightviolet': '#ae2191',
+	'darkviolet': '#6b2b8c',
 }
 
 ########## http://docs.python.org/library/datetime.html#tzinfo-objects #############
@@ -493,7 +493,7 @@ if len(args) != 1:
 
 if options.color:
 	if options.color not in colors.keys():
-		print 'Invalid color, must be one of ' + str(colors.keys())
+		print 'Invalid color, must be one of ' + str(colors.keys()) + ', see also http://i.imgur.com/hlzHw.png'
 		sys.exit(-1)
 
 datadir = os.path.dirname(sys.argv[0])
