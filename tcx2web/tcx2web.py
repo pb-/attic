@@ -8,12 +8,24 @@ import pickle
 import time
 import xml.sax
 import xml.sax.handler
+import optparse
 
 import dp
 import dataplot
 import gpx
 
 cache = {}
+
+colors = {
+	'red': '#d9182b',
+	'lightblue': '#0099d1',
+	'darkblue': '#1c449c',
+	'darkgreen': '#037746',
+	'lightgreen': '#79af3d',
+	'orange': '#e8991a',
+	'darkviolet': '#6b2b8c',
+	'lightviolet': '#ae2191',
+}
 
 ########## http://docs.python.org/library/datetime.html#tzinfo-objects #############
 
@@ -147,11 +159,20 @@ def writeIndex(datadir):
 	totalTime = datetime.timedelta(0)
 
 	for c in courses:
+		if hasattr(c, 'color'):
+			extrastylebg = ' style="background-color: %s;"' % colors[c.color]
+			extrastylebdr = ' style="border-color: %s;"' % colors[c.color]
+		else:
+			extrastylebg = ''
+			extrastylebdr = ''
+
 		rides += getTemplate(datadir, 'index-course', {
 			'dir': c.dname,
 			'dist': round(c.dist/1000),
 			'climb': c.asc,
 			'date': c.start.strftime('%Y-%m-%d'),
+			'extrastylebg': extrastylebg,
+			'extrastylebdr': extrastylebdr,
 		})
 
 		totalDist += c.dist
@@ -462,12 +483,25 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		self.inTp = False
 
 
+op = optparse.OptionParser()
+op.add_option('-c', '--color', dest='color', help='Use COLOR for the index icon')
+(options, args) = op.parse_args()
+
+if len(args) != 1:
+	print 'Usage: %s [--color=COLOR] TCXFILE' % sys.argv[0]
+	sys.exit(-1)
+
+if options.color:
+	if options.color not in colors.keys():
+		print 'Invalid color, must be one of ' + str(colors.keys())
+		sys.exit(-1)
 
 datadir = os.path.dirname(sys.argv[0])
 
 p = TcxParser()
 
-course = p.parse(sys.argv[1])
+course = p.parse(args[0])
+course.color = options.color
 writeCourse(datadir, course)
 writeIndex(datadir)
 
