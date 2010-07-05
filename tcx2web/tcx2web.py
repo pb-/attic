@@ -159,7 +159,7 @@ def writeIndex(datadir):
 	totalTime = datetime.timedelta(0)
 
 	for c in courses:
-		if hasattr(c, 'color'):
+		if hasattr(c, 'color') and c.color:
 			extrastylebg = ' style="background-color: %s;"' % colors[c.color]
 			extrastylebdr = ' style="border-color: %s;"' % colors[c.color]
 		else:
