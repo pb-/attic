@@ -50,6 +50,7 @@ function initMap() {
 	$('graphAltitude').addEvent('mousemove', graphAltitudeMouseMove);
 	$('graphSpeed').addEvent('mousemove', graphSpeedMouseMove);
 	$('graphCadence').addEvent('mousemove', graphCadenceMouseMove);
+	$('graphHR').addEvent('mousemove', graphHRMouseMove);
 }
 
 function graphAltitudeMouseMove(event) {
@@ -62,6 +63,10 @@ function graphSpeedMouseMove(event) {
 
 function graphCadenceMouseMove(event) {
 	graphMouseMove(event, 'graphCadence');
+}
+
+function graphHRMouseMove(event) {
+	graphMouseMove(event, 'graphHR');
 }
 
 function graphMouseMove(event, graph) {

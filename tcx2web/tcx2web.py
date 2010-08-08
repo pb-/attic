@@ -204,6 +204,7 @@ def writeCourse(datadir, course):
 	samplesAlt = []
 	samplesSpeed = []
 	samplesCad = []
+	samplesHR = []
 	positions = []
 
 	for i in range(width):
@@ -223,6 +224,11 @@ def writeCourse(datadir, course):
 				samplesCad.append((position / 1000, course.trackpoints[pi].cad))
 			else:
 				samplesCad.append((position / 1000, 0))
+
+		if course.trackpoints[pi].hr:
+			samplesHR.append((position / 1000, course.trackpoints[pi].hr))
+		else:
+			samplesHR.append((position / 1000, 0))
 
 		if (pi+1) < len(course.trackpoints):
 			deltaDist = course.trackpoints[pi+1].dist - course.trackpoints[pi].dist
@@ -275,7 +281,14 @@ def writeCourse(datadir, course):
 		cfg.color.area = (0xeb,0xcd,0xb7)
 		plot = plotter.plotPoints(samplesCad, cfg)
 		plot.writePng(os.path.join(dirname, 'cadence.png'))
-
+	
+	if len(samplesHR) > 0:
+		cfg.label.y = 'Heart Rate [bpm]'
+		cfg.color.graph = (0x96,0x0,0xff)
+		cfg.color.area = (0xe6,0xc2,0xff)
+		plot = plotter.plotPoints(samplesHR, cfg)
+		plot.writePng(os.path.join(dirname, 'heartrate.png'))
+	
 	# position index
 	f = open(os.path.join(dirname, 'pindex.js'), 'w')
 	f.write('var positionIndex = [')
@@ -477,8 +490,11 @@ class TcxParser(xml.sax.handler.ContentHandler):
 	def handleAltitudeMetersEnd(self):
 		self.alt = float(self.text.strip())
 	
+	def handleValueEnd(self):
+		self.hr = int(self.text.strip())
+	
 	def handleTrackpointEnd(self):
-		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, 0))
+		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, self.hr))
 
 		self.inTp = False
 
