@@ -282,7 +282,7 @@ def writeCourse(datadir, course):
 		plot = plotter.plotPoints(samplesCad, cfg)
 		plot.writePng(os.path.join(dirname, 'cadence.png'))
 	
-	if len(samplesHR) > 0:
+	if course.heartrate:
 		cfg.label.y = 'Heart Rate [bpm]'
 		cfg.color.graph = (0x96,0x0,0xff)
 		cfg.color.area = (0xe6,0xc2,0xff)
@@ -360,7 +360,7 @@ class Trackpoint:
 
 
 class Course:
-	def __init__(self, id, start, time, dist, vmax, calories, cadence):
+	def __init__(self, id, start, time, dist, vmax, calories, cadence, heartrate):
 		self.id = id
 		self.start = start
 		self.time = time
@@ -368,6 +368,7 @@ class Course:
 		self.vmax = vmax
 		self.calories = calories
 		self.cadence = cadence
+		self.heartrate = heartrate
 
 		self.trackpoints = []
 		self.asc = 0
@@ -417,6 +418,7 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		self.vmax = None
 		self.calories = 0
 		self.cad = None
+		self.hr = None
 		self.start = None
 
 		self.inTp = False
@@ -459,7 +461,7 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		if not self.start:
 			self.start = self.trackpoints[0].time
 
-		self.course = Course(self.id, self.start, self.time, self.dist, self.vmax, self.calories, self.cad)
+		self.course = Course(self.id, self.start, self.time, self.dist, self.vmax, self.calories, self.cad, self.hr)
 
 		self.course.trackpoints = self.trackpoints
 		self.course.end = self.course.trackpoints[-1].time
@@ -474,7 +476,7 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		self.alt = None
 		self.tpdist = None
 		self.tpcad = None
-		self.hr = None
+		self.tphr = None
 
 		self.inTp = True
 	
@@ -491,10 +493,13 @@ class TcxParser(xml.sax.handler.ContentHandler):
 		self.alt = float(self.text.strip())
 	
 	def handleValueEnd(self):
-		self.hr = int(self.text.strip())
+		if self.inTp:
+			self.hr = int(self.text.strip())
+		else:
+			self.tphr = int(self.text.strip())
 	
 	def handleTrackpointEnd(self):
-		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, self.hr))
+		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, self.tphr))
 
 		self.inTp = False
 
