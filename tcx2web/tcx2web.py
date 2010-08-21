@@ -105,6 +105,7 @@ def getTemplate(datadir, name, data):
 def htmlCourse(datadir, course):
 
 	dur = (course.end - course.start).seconds
+	durm = int(course.time)
 
 	data = {
 		'id': course.id,
@@ -112,6 +113,7 @@ def htmlCourse(datadir, course):
 		'start': course.start.strftime('%H:%M'),
 		'end': course.end.strftime('%H:%M'),
 		'duration': '%02d:%02d:%02d' % (dur / 3600, dur % 3600 / 60, dur % 60),
+		'duration_move': '%02d:%02d:%02d' % (durm / 3600, durm % 3600 / 60, durm % 60),
 		'distance': course.dist / 1000,
 		'climb': course.asc,
 		'vavg': (3.6 * course.dist / dur),
