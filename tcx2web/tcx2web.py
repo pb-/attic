@@ -496,9 +496,9 @@ class TcxParser(xml.sax.handler.ContentHandler):
 	
 	def handleValueEnd(self):
 		if self.inTp:
-			self.hr = int(self.text.strip())
-		else:
 			self.tphr = int(self.text.strip())
+		else:
+			self.hr = int(self.text.strip())
 	
 	def handleTrackpointEnd(self):
 		self.trackpoints.append(Trackpoint(self.tptime, self.lat, self.lon, self.alt, self.tpdist, self.tpcad, self.tphr))
