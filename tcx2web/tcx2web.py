@@ -117,6 +117,7 @@ def htmlCourse(datadir, course):
 		'distance': course.dist / 1000,
 		'climb': course.asc,
 		'vavg': (3.6 * course.dist / dur),
+		'vavg_move': (3.6 * course.dist / durm),
 	}
 
 	if course.vmax:
