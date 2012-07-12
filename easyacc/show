@@ -1,0 +1,245 @@
+#!/usr/bin/python
+#
+import math
+import sys
+import copy
+import datetime
+
+def parse(s):
+	val = s.split('.')
+	value = abs(int(val[0])) * 100
+	if len(val) > 1:
+		if len(val[1]) == 1:
+			val[1] += '0'
+		value += int(val[1])
+
+	return value
+
+def fmt(bal, diff = False):
+	if not diff:
+		if bal == 0 or not sys.stdout.isatty():
+			return '%8.2f' % (float(bal)/100)
+		elif bal < 0:
+			return '\033[31m%8.2f\033[0m' % (float(bal)/100)
+		else:
+			return '\033[32m%8.2f\033[0m' % (float(bal)/100)
+	else:
+		if bal != 0 and not sys.stdout.isatty():
+			return '%+8.2f' % (float(bal)/100)
+		elif bal > 0:
+			return '\033[32m%+8.2f\033[0m' % (float(bal)/100)
+		elif bal < 0:
+			return '\033[31m%8.2f\033[0m' % (float(bal)/100)
+		else:
+			return '%8s' % '~'
+
+def mod_acc(acc, amt):
+	while acc:
+		balances[acc] += amt
+		acc = parents[acc]
+
+def prune_unchanged(parent = None):
+	keep = []
+	
+	for o in order:
+		if parents[o] == parent:
+			keep.extend(prune_unchanged(o))
+
+			for i in range(num):
+				if o not in log_bal[i] or log_bal[i][o] != log_bal[0][o]:
+					keep.append(o)
+					break
+	return keep
+
+def display_trans(parent = None, depth = 0):
+	for o in order:
+		if parents[o] == parent:
+			print '%-12s' % ('  ' * depth + o + ':'),
+
+			# first
+			if o in log_bal[log_idx]:
+				print '%s' % fmt(log_bal[log_idx][o]),
+			else:
+				print '%8s' % '*',
+
+			# diffs
+			for i in range(num-1):
+				if o in log_bal[(log_idx + i + 1) % num] and o in log_bal[(log_idx + i) % num]:
+					print '%s' % fmt(log_bal[(log_idx + i + 1) % num][o] - log_bal[(log_idx + i) % num][o], True),
+				elif o in log_bal[(log_idx + i + 1) % num]:
+					print '%s' % fmt(log_bal[(log_idx + i + 1) % num][o], True),
+				else:
+					print '%8s' % '*',
+					
+			# last
+			if o in log_bal[(log_idx + num - 1) % num]:
+				print '%s' % fmt(log_bal[(log_idx + num - 1) % num][o])
+			else:
+				print '%8s' % '*'
+			
+			display_trans(o, depth + 1)
+
+def display_balances(parent = None, depth = 0):
+	children = []
+	for o in order:
+		if parents[o] == parent:
+			children.append(o)
+
+	for i, o in enumerate(children):
+		print ' ',
+		if depth > 0:
+			print '%-15s %s EUR' % ('  |' * (depth-1) + '  |-' + o + ':', fmt(balances[o]))
+		else:
+			print '%-15s %s EUR' % (' ' + o + ':', fmt(balances[o]))
+		display_balances(o, depth + 1)
+
+
+def usage():
+	print 'usage: %s SUBCOMMAND ...' % sys.argv[0]
+	print '  subcommands:'
+	print '    bal            show current balances for all accounts'
+	print '    acc NAME       show transactions on account NAME'
+	print '    trans [NUM]    show last NUM (default: 1) transactions'
+	sys.exit(-1)
+
+
+f = file('transactions.txt', 'r')
+
+balances = {}
+parents = {}
+order = []
+
+if len(sys.argv) < 2 or sys.argv[1] not in ('bal', 'acc', 'trans'):
+	usage()
+
+subcmd = sys.argv[1]
+
+if subcmd == 'acc' and len(sys.argv) < 3:
+	usage()
+elif subcmd == 'acc':
+	account = sys.argv[2]
+	balances_before = {}
+
+if subcmd == 'trans' and len(sys.argv) > 2:
+	num = int(sys.argv[2]) + 1
+else:
+	num = 2
+
+log_bal = [None] * num
+log_cmt = [None] * num
+log_bal[0] = copy.copy(balances)
+log_idx = 1
+
+in_trans = False
+
+for line in f:
+	parts = line.strip().split(' ')
+	if parts[0] == '#' or parts[0] == '':
+		continue
+
+	comment = ''
+	expl = ''
+
+	for i, v in enumerate(parts):
+		if len(v) > 0 and v[0] == '#':
+			comment = ' '.join(parts[i+1:])
+			break
+
+	if parts[0] == 'bgn':
+		in_trans = True
+		trans_cmt = comment
+		continue
+
+	if parts[0] == 'end':
+		in_trans = False
+		comment = trans_cmt
+
+	if parts[0] == 'crt':
+		balances[parts[1]] = 0
+		parents[parts[1]] = None
+		order.append(parts[1])
+		continue
+	
+	if parts[0] == 'cts':
+		balances[parts[2]] = 0
+		parents[parts[2]] = parts[1]
+		order.append(parts[2])
+		continue
+
+	if parts[0] == 'cls':
+		acc = parts[1]
+		if not balances[acc] == 0:
+			raise Exception('cannot close account ' + acc + ': non-zero balance')
+		elif subcmd == 'bal':
+			del balances[acc]
+			del parents[acc]
+			order.remove(acc)
+				
+		continue
+	
+	if parts[0] == 'dep':
+		acc = parts[1]
+		amt = parse(parts[2])
+		mod_acc(acc, amt)
+		expl = 'deposition into %s' % acc
+
+	if parts[0] == 'wth':
+		acc = parts[1]
+		amt = parse(parts[2])
+		mod_acc(acc, -amt)
+		expl = 'withdrawal from %s' % acc
+
+	if parts[0] == 'xfr':
+		from_acc = parts[1]
+		to_acc = parts[2]
+		amt = parse(parts[3])
+
+		mod_acc(from_acc, -amt)
+		mod_acc(to_acc, amt)
+		expl = 'transfer from %s to %s' % (from_acc, to_acc)
+
+	if not in_trans:
+		log_bal[log_idx] = copy.copy(balances)
+		log_cmt[log_idx] = comment
+		log_idx = (log_idx + 1) % num
+
+	if subcmd == 'acc':
+		if account in balances and account in balances_before:
+			change = balances[account] - balances_before[account]
+			if change != 0:
+				if len(comment) > 0 and sys.stdout.isatty():
+					comment = '[\033[34m%s\033[0m]' % comment
+				elif len(comment) > 0:
+					comment = '[%s]' % comment
+
+				print '%s  %s  %s' % (fmt(change), expl, comment)
+			
+		balances_before = copy.copy(balances)
+
+
+
+if subcmd == 'trans':
+	order = prune_unchanged()
+
+	print 'account        before',
+	for i in range(num-1):
+		print '%8s' % ('(' + str(i+1) + ')'),
+	print '   after'
+	print '-' * (30 + (num-1)*9)
+
+	display_trans()
+
+	print
+	print 'key:'
+	for i in range(num-1):
+		cmt = log_cmt[(log_idx + i + 1) % num]
+		if cmt:
+			print ' (%d) %s' % (i+1, cmt)
+elif subcmd == 'bal':
+	print 'Account balances as of ' + str(datetime.date.today())
+	print '---------------------------------'
+	display_balances()
+	print '---------------------------------'
+elif subcmd == 'acc':
+	print '-' * 60
+	print '%s  current balance' % fmt(balances[account])
