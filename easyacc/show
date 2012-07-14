@@ -43,12 +43,16 @@ def prune_unchanged(parent = None):
 	
 	for o in order:
 		if parents[o] == parent:
-			keep.extend(prune_unchanged(o))
+			k = prune_unchanged(o)
 
-			for i in range(num):
-				if o not in log_bal[i] or log_bal[i][o] != log_bal[0][o]:
-					keep.append(o)
-					break
+			if len(k) > 0:
+				keep.extend(k)
+				keep.append(o)
+			else:
+				for i in range(num):
+					if o not in log_bal[i] or log_bal[i][o] != log_bal[0][o]:
+						keep.append(o)
+						break
 	return keep
 
 def display_trans(parent = None, depth = 0):
@@ -204,8 +208,11 @@ for line in f:
 		log_idx = (log_idx + 1) % num
 
 	if subcmd == 'acc':
-		if account in balances and account in balances_before:
-			change = balances[account] - balances_before[account]
+		if account in balances:
+			if account in balances_before:
+				change = balances[account] - balances_before[account]
+			else:
+				change = balances[account]
 			if change != 0:
 				if len(comment) > 0 and sys.stdout.isatty():
 					comment = '[\033[34m%s\033[0m]' % comment
