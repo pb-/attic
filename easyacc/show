@@ -4,6 +4,7 @@ import math
 import sys
 import copy
 import datetime
+import subprocess
 
 def parse(s):
 	val = s.split('.')
@@ -14,6 +15,13 @@ def parse(s):
 		value += int(val[1])
 
 	return value
+
+def is_number(s):
+	try:
+		float(s)
+		return True
+	except ValueError:
+		return False
 
 def fmt(bal, diff = False):
 	if not diff:
@@ -107,7 +115,10 @@ def usage():
 	sys.exit(-1)
 
 
-f = file('transactions.txt', 'r')
+if sys.argv[-1] == '-v':
+	f = subprocess.Popen(['svn', 'annotate', '-v', 'transactions.txt'], stdout=subprocess.PIPE).stdout
+else:
+	f = file('transactions.txt', 'r')
 
 balances = {}
 parents = {}
@@ -134,9 +145,11 @@ log_cmt = [None] * num
 log_bal[0] = copy.copy(balances)
 log_idx = 1
 
-in_trans = False
-
 for line in f:
+	if sys.argv[-1] == '-v':
+		date = line[18:28]
+		line = line[63:]
+
 	parts = line.strip().split(' ')
 	if parts[0] == '#' or parts[0] == '':
 		continue
@@ -146,17 +159,12 @@ for line in f:
 
 	for i, v in enumerate(parts):
 		if len(v) > 0 and v[0] == '#':
+			if parts[i+1] == 'old':
+				date = parts[i+2]
+				i += 3
 			comment = ' '.join(parts[i+1:])
+			parts = parts[0:i]
 			break
-
-	if parts[0] == 'bgn':
-		in_trans = True
-		trans_cmt = comment
-		continue
-
-	if parts[0] == 'end':
-		in_trans = False
-		comment = trans_cmt
 
 	if parts[0] == 'crt':
 		balances[parts[1]] = 0
@@ -202,10 +210,27 @@ for line in f:
 		mod_acc(to_acc, amt)
 		expl = 'transfer from %s to %s' % (from_acc, to_acc)
 
-	if not in_trans:
-		log_bal[log_idx] = copy.copy(balances)
-		log_cmt[log_idx] = comment
-		log_idx = (log_idx + 1) % num
+	if parts[0] == 'gxto' or parts[0] == 'gxfr':
+		s = 1 if parts[0] == 'gxto' else -1
+		target_acc = parts[1]
+		if is_number(parts[2]):
+			accs = parts[3:]
+			amt = int(math.ceil(float(parse(parts[2])) / len(accs)))
+			for a in accs:
+				mod_acc(target_acc, amt * s)
+				mod_acc(a, -amt * s)
+		else:
+			accamts = iter(parts[2:])
+			for acc in accamts:
+				amt = parse(accamts.next())
+				mod_acc(target_acc, amt * s)
+				mod_acc(acc, -amt * s)
+		expl = 'group transfer'
+		
+
+	log_bal[log_idx] = copy.copy(balances)
+	log_cmt[log_idx] = comment
+	log_idx = (log_idx + 1) % num
 
 	if subcmd == 'acc':
 		if account in balances:
@@ -219,6 +244,8 @@ for line in f:
 				elif len(comment) > 0:
 					comment = '[%s]' % comment
 
+				if sys.argv[-1] == '-v':
+					print '%s ' % date,
 				print '%s  %s  %s' % (fmt(change), expl, comment)
 			
 		balances_before = copy.copy(balances)
@@ -249,4 +276,6 @@ elif subcmd == 'bal':
 	print '---------------------------------'
 elif subcmd == 'acc':
 	print '-' * 60
+	if sys.argv[-1] == '-v':
+		print ' ' * 11,
 	print '%s  current balance' % fmt(balances[account])
