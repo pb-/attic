@@ -166,6 +166,8 @@ for line in f:
 			parts = parts[0:i]
 			break
 
+	parts = filter(lambda x: len(x) > 0, parts)
+
 	if parts[0] == 'crt':
 		balances[parts[1]] = 0
 		parents[parts[1]] = None
