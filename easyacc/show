@@ -23,23 +23,26 @@ def is_number(s):
 	except ValueError:
 		return False
 
-def fmt(bal, diff = False):
-	if not diff:
-		if bal == 0 or not sys.stdout.isatty():
-			return '%8.2f' % (float(bal)/100)
-		elif bal < 0:
-			return '\033[31m%8.2f\033[0m' % (float(bal)/100)
+def fmt(bal, diff = False, pad = False):
+	if diff:
+		if bal == 0:
+			s = '~'
 		else:
-			return '\033[32m%8.2f\033[0m' % (float(bal)/100)
+			s = '%+.2f' % (float(bal)/100)
 	else:
-		if bal != 0 and not sys.stdout.isatty():
-			return '%+8.2f' % (float(bal)/100)
-		elif bal > 0:
-			return '\033[32m%+8.2f\033[0m' % (float(bal)/100)
+		s = '%.2f' % (float(bal)/100)
+
+	l = len(s)
+	if sys.stdout.isatty():
+		if bal > 0:
+			s = '\033[32m%s\033[0m' % s
 		elif bal < 0:
-			return '\033[31m%8.2f\033[0m' % (float(bal)/100)
-		else:
-			return '%8s' % '~'
+			s = '\033[31m%s\033[0m' % s
+	if l < 7:
+		pad = '.' if pad else ' '
+		s = pad * (6-l) + ' ' + s
+
+	return s
 
 def mod_acc(acc, amt):
 	if acc in vaccs:
@@ -67,7 +70,7 @@ def display_trans():
 				if o in log_bal[log_idx]:
 					print '%s' % fmt(log_bal[log_idx][o]),
 				else:
-					print '%8s' % '*',
+					print '%7s' % '*',
 
 				# diffs
 				for i in range(num-1):
@@ -76,13 +79,13 @@ def display_trans():
 					elif o in log_bal[(log_idx + i + 1) % num]:
 						print '%s' % fmt(log_bal[(log_idx + i + 1) % num][o], True),
 					else:
-						print '%8s' % '*',
+						print '%7s' % '*',
 						
 				# last
 				if o in log_bal[(log_idx + num - 1) % num]:
 					print '%s' % fmt(log_bal[(log_idx + num - 1) % num][o])
 				else:
-					print '%8s' % '*'
+					print '%7s' % '*'
 		if b:
 			print
 			
@@ -92,7 +95,8 @@ def display_balances():
 		for o in order:
 			if (o in vaccs) ^ b:
 				s = '*' if not b else ''
-				print '     %-10s %s EUR' % (o+s, fmt(balances[o]))
+				s += ' ' + '.' * (11 - len(o+s))
+				print '     %s%s EUR' % (o+s, fmt(balances[o], False, True))
 		if b:
 			print
 
@@ -172,8 +176,11 @@ for line in f:
 		balances[parts[1]] = 0
 		order.append(parts[1])
 		vaccs[parts[1]] = parts[2:]
-		update_vaccs();
 		expl = 'create virtual account'
+
+	elif parts[0] == 'vad':
+		vaccs[parts[1]].append(parts[2])
+		expl = 'add %s to virtual account' % parts[2]
 
 	elif parts[0] == 'cls':
 		acc = parts[1]
@@ -224,7 +231,7 @@ for line in f:
 				amt = parse(accamts.next())
 				mod_acc(target_acc, amt * s)
 				mod_acc(acc, -amt * s)
-		expl = 'group transfer'
+		expl = 'compound transfer'
 
 	else:
 		raise Exception('unknown command: ' + parts[0])
@@ -258,11 +265,11 @@ for line in f:
 if subcmd == 'trans':
 	order = prune_unchanged()
 
-	print 'account      before',
+	print 'account     before',
 	for i in range(num-1):
-		print '%8s' % ('(' + str(i+1) + ')'),
-	print '   after'
-	print '-' * (28 + (num-1)*9)
+		print '%7s' % ('(' + str(i+1) + ')'),
+	print '  after'
+	print '-' * (26 + (num-1)*8)
 
 	display_trans()
 
