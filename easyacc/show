@@ -5,8 +5,12 @@ import sys
 import copy
 import datetime
 import subprocess
+import re
 
-def parse(s):
+colmap = {'r': 31, 'g': 32, 'y': 33, 'b': 34, 'm': 35, 'c': 36, 'w': 37}
+colre = re.compile('{([%s].*?)}' % reduce(lambda x, y: x+y, colmap.keys()))
+
+def num_parse(s):
 	val = s.split('.')
 	value = abs(int(val[0])) * 100
 	if len(val) > 1:
@@ -16,14 +20,14 @@ def parse(s):
 
 	return value
 
-def is_number(s):
+def num_test(s):
 	try:
 		float(s)
 		return True
 	except ValueError:
 		return False
 
-def fmt(bal, diff = False, pad = False):
+def num_fmt(bal, diff = False, pad = False):
 	if diff:
 		if bal == 0:
 			s = '~'
@@ -44,248 +48,537 @@ def fmt(bal, diff = False, pad = False):
 
 	return s
 
-def mod_acc(acc, amt):
-	if acc in vaccs:
-		raise Exception('illegal modification of virtual account "' + acc + '"')
-	balances[acc] += amt
+def range_spec_parse(s):
+	parts = s.split(':')
+	if len(parts) == 1:
+		n = int(parts[0])
+		if n >= 0:
+			return (n-1,n+1)
+		else:
+			return (n-1,None)
+	else:
+		m = int(parts[0])
+		n = int(parts[1])
+		if parts[1][0] == '+':
+			return (m-1,m+n+1)
+		else:
+			return (m-1,n+1)
 
-def prune_unchanged():
-	keep = []
+def col(s, color = True):
+	if color:
+		return colre.sub(lambda x: '\033[%dm%s\033[0m' % (colmap[x.group(1)[0]], x.group(1)[1:]), s)
+	else:
+		return colre.sub(lambda x: x.group(1)[1:], s)
+
+class Accounts(object):
+	def __init__(self):
+		self.accs = []
+
+	def add(self, name):
+		a = [name, False, 0]
+		for i in range(len(self.accs)):
+			if self.accs[i][1]:
+				self.accs.insert(i, a)
+				return
+		self.accs.append(a)
+
+	def addv(self, name, accs):
+		for a in accs:
+			if self.find(a)[1]:
+				raise Exception('illegal nesting of virtual accounts')
+		self.accs.append([name, True, accs])
+
+	def addtov(self, vname, name):
+		a = self.find(vname)
+		n = self.find(name)
+		a[2].append(name)
+
+	def remove(self, name):
+		i = self.findi(name)
+		if self.accs[i][1]:
+			self.accs.pop(i)
+		else:
+			if self.accs[i][2] != 0:
+				raise Exception('cannot close account "%s" due to non-zero balance' % name)
+			else:
+				self.accs.pop(i)
+				for a in self.accs:
+					if a[1] and name in a[2]:
+						a[2].remove(name)
+
+	def findi(self, name):
+		for i in range(len(self.accs)):
+			if self.accs[i][0] == name:
+				return i
+		raise Exception('request for unknown account "%s"' % name)
+
+	def find(self, name):
+		return self.accs[self.findi(name)]
+
+	def mod(self, name, amt):
+		a = self.find(name)
+		if a[1]:
+			raise Exception('illegal modification of virtual account "%s"' % name)
+		a[2] += amt
+
+	def bal(self, name):
+		a = self.find(name)
+		if a[1]:
+			return sum(map(lambda x: self.bal(x), a[2]))
+		else:
+			return a[2]
+
+	def list(self):
+		for a in self.accs:
+			yield a[0]
+
+	def listv(self, acc = None):
+		for a in self.accs:
+			if a[1] and (not acc or acc and acc in a[2]):
+				yield a[0]
+
+	def is_virtual(self, name):
+		return self.find(name)[1]
+
+
+class Command(object):
+	def __init__(self, txnum, cmd, args, cmt, date = None):
+		self.txnum = txnum
+		self.cmd = cmd
+		self.args = args
+		self.cmt = cmt
+		self.date = date
+
+	def fmt(self, color = False):
+		return col('{y%04d} %s %s{b%s}' % (self.txnum, self.cmd, ' '.join(self.args), ' # ' + self.cmt if self.cmt else ''), color)
+
+	def appl(self, accs):
+		raise Exception('not implemented')
+
+	def expl(self):
+		return '<' + self.fmt(False) + '>'
+
+class CreateAccountCommand(Command):
+	def appl(self, accs):
+		accs.add(self.args[0])
 	
-	for o in order:
-		for i in range(num):
-			if o not in log_bal[i] or log_bal[i][o] != log_bal[0][o]:
-				keep.append(o)
-				break
-	return keep
+	def fmt(self, color = False):
+		return col('{y%04d} %s {m%s}{b%s}' % (self.txnum, self.cmd, self.args[0], ' # ' + self.cmt if self.cmt else ''), color)
 
-def display_trans():
-	for b in (True,False):
-		for o in order:
-			if (o in vaccs) ^ b:
-				s = '*' if not b else ''
-				print '%-10s' % (o+s),
+class CloseAccountCommand(Command):
+	def appl(self, accs):
+		accs.remove(self.args[0])
+	
+	def fmt(self, color = False):
+		return col('{y%04d} %s {m%s}{b%s}' % (self.txnum, self.cmd, self.args[0], ' # ' + self.cmt if self.cmt else ''), color)
 
-				# first
-				if o in log_bal[log_idx]:
-					print '%s' % fmt(log_bal[log_idx][o]),
-				else:
-					print '%7s' % '*',
+class CreateVirtualAccountCommand(Command):
+	def appl(self, accs):
+		accs.addv(self.args[0], self.args[1:])
+	
+	def fmt(self, color = False):
+		return col('{y%04d} %s {m%s} %s{b%s}' % (self.txnum, self.cmd, self.args[0], ' '.join(self.args[1:]), ' # ' + self.cmt if self.cmt else ''), color)
 
-				# diffs
-				for i in range(num-1):
-					if o in log_bal[(log_idx + i + 1) % num] and o in log_bal[(log_idx + i) % num]:
-						print '%s' % fmt(log_bal[(log_idx + i + 1) % num][o] - log_bal[(log_idx + i) % num][o], True),
-					elif o in log_bal[(log_idx + i + 1) % num]:
-						print '%s' % fmt(log_bal[(log_idx + i + 1) % num][o], True),
-					else:
-						print '%7s' % '*',
-						
-				# last
-				if o in log_bal[(log_idx + num - 1) % num]:
-					print '%s' % fmt(log_bal[(log_idx + num - 1) % num][o])
-				else:
-					print '%7s' % '*'
-		if b:
-			print
+class AddToVirtualAccountCommand(Command):
+	def appl(self, accs):
+		accs.addtov(self.args[0], self.args[1])
+	
+	def fmt(self, color = False):
+		return col('{y%04d} %s {m%s} %s{b%s}' % (self.txnum, self.cmd, self.args[0], self.args[1], ' # ' + self.cmt if self.cmt else ''), color)
+
+class DepositCommand(Command):
+	def appl(self, accs):
+		accs.mod(self.args[0], num_parse(self.args[1]))
+
+	def fmt(self, color = False):
+		return col('{y%04d} %s {g%s} %s{b%s}' % (self.txnum, self.cmd, self.args[0], self.args[1], ' # ' + self.cmt if self.cmt else ''), color)
+
+	def expl(self):
+		return 'deposition into %s' % self.args[0]
+
+class WithdrawCommand(Command):
+	def appl(self, accs):
+		accs.mod(self.args[0], -num_parse(self.args[1]))
+
+	def fmt(self, color = False):
+		return col('{y%04d} %s {r%s} %s{b%s}' % (self.txnum, self.cmd, self.args[0], self.args[1], ' # ' + self.cmt if self.cmt else ''), color)
+	
+	def expl(self):
+		return 'withdrawal from %s' % self.args[0]
+
+class TransferCommand(Command):
+	def appl(self, accs):
+		amt = num_parse(self.args[2])
+		accs.mod(self.args[0], -amt)
+		accs.mod(self.args[1], +amt)
+
+	def fmt(self, color = False):
+		return col('{y%04d} %s {r%s} {g%s} %s{b%s}' % (self.txnum, self.cmd, self.args[0], self.args[1], self.args[2], ' # ' + self.cmt if self.cmt else ''), color)
+	
+	def expl(self):
+		return 'transfer from %s to %s' % (self.args[0], self.args[1])
+
+class GroupTransferCommand(Command):
+	def appl(self, accs):
+		s = 1 if self.cmd == 'gxto' else -1
+		target_acc = self.args[0]
+		if num_test(self.args[1]):
+			accs = self.args[2:]
+			amt = int(math.ceil(float(num_parse(self.args[1])) / len(accs)))
+			for a in accs:
+				accs.mod(target_acc, s*amt)
+				accs.mod(a, -s*amt)
+		else:
+			accamts = iter(self.args[1:])
+			for acc in accamts:
+				amt = num_parse(accamts.next())
+				accs.mod(target_acc, s*amt)
+				accs.mod(acc, -s*amt)
+
+	def fmt(self, color = False):
+		s = '{y%04d} %s {%c%s}' % (self.txnum, self.cmd, 'g' if self.cmd == 'gxto' else 'r', self.args[0])
+
+		c = 'r' if self.cmd == 'gxto' else 'g'
+		if num_test(self.args[1]):
+			s += ' %s {%c%s}' % (self.args[1], c, ' '.join(self.args[2:]))
+		else:
+			accamts = iter(self.args[1:])
+			for acc in accamts:
+				amt = accamts.next()
+				s += ' {%c%s} %s' % (c, acc, amt)
+
+		s += '{b%s}' % (' # ' + self.cmt if self.cmt else '')
+
+		return col(s, color)
+
+	def expl(self):
+		if self.cmd == 'gxto':
+			return 'compound transfer to %s' % self.args[0]
+		else:
+			return 'compound transfer from %s' % self.args[0]
+
+
+def command_factory(txnum, cmd, args, cmt, date = None):
+	if cmd == 'crt':
+		return CreateAccountCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'cls':
+		return CloseAccountCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'vcr':
+		return CreateVirtualAccountCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'vad':
+		return AddToVirtualAccountCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'dep':
+		return DepositCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'wth':
+		return WithdrawCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'xfr':
+		return TransferCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'gxto':
+		return GroupTransferCommand(txnum, cmd, args, cmt, date)
+	elif cmd == 'gxfr':
+		return GroupTransferCommand(txnum, cmd, args, cmt, date)
+	else:
+		raise Exception('unknown command "%s"' % cmd)
+
+def parser(stream, annotated = False):
+	txnum = 1
+	while True:
+		line = stream.readline()
+		if len(line) == 0:
+			break
+
+		if annotated:
+			date = line[18:28]
+			line = line[63:]
+		else:
+			date = None
+
+		parts = line.strip().split(' ')
+		if parts[0] != '#' and len(parts[0]) > 0:
+			comment = None
+			for i, v in enumerate(parts):
+				if len(v) > 0 and v[0] == '#':
+					ii = i
+					if parts[i+1][0] == '@':
+						date = parts[i+1][1:]
+						i += 1
+					comment = ' '.join(parts[i+1:])
+					parts = parts[0:ii]
+					break
+
+			parts = filter(lambda x: len(x) > 0, parts)
+			yield command_factory(txnum, parts[0], parts[1:], comment, date)
+			txnum += 1
+
+
+
+def prune_unchanged(accs):
+	# gather all accounts
+	names = []
+	for a in accs:
+		for name in a.list():
+			if (name, False) not in names and (name, True) not in names:
+				names.append((name, a.is_virtual(name)))
+
+	# gather changed accs
+	keep = []
+	for i in range(len(accs)-1):
+		for name, v in names:
+			if name not in keep:
+				if name not in accs[i].list() or name not in accs[i+1].list():
+					keep.append(name)
+				elif accs[i].bal(name) != accs[i+1].bal(name):
+					keep.append(name)
+
+	names = filter(lambda x: x[0] in keep, names)
+
+	return names
+
+def display_trans(accs, names):
+	v = False
+	for o, virtual in names:
+		if virtual:
+			if not v:
+				print
+			s = '*'
+			v = True
+		else:
+			s = ''
+		
+		print '%-10s' % (o+s),
+
+		# first
+		if o in accs[0].list():
+			print '%s' % num_fmt(accs[0].bal(o)),
+		else:
+			print '%7s' % '*',
+
+		# diffs
+		for i in range(len(accs)-1):
+			if o in accs[i].list() and o in accs[i+1].list():
+				print '%s' % num_fmt(accs[i+1].bal(o) - accs[i].bal(o), True),
+			elif o in accs[i+1].list():
+				print '%s' % num_fmt(accs[i+1].bal(o), True),
+			else:
+				print '%7s' % '*',
+				
+		# last
+		if o in accs[-1].list():
+			print '%s' % num_fmt(accs[-1].bal(o))
+		else:
+			print '%7s' % '*'
 			
 
-def display_balances():
-	for b in (True,False):
-		for o in order:
-			if (o in vaccs) ^ b:
-				s = '*' if not b else ''
-				s += ' ' + '.' * (11 - len(o+s))
-				print '     %s%s EUR' % (o+s, fmt(balances[o], False, True))
-		if b:
+def cmd_acc(parser, acc, verbose = False):
+	display_width = 80
+	accs = Accounts()
+	accs_before = Accounts()
+	
+	print 'transaction' + ' ' * (display_width-25) + 'change     bal'
+	print '-' * display_width
+
+	for c in parser:
+		c.appl(accs)
+
+		try:
+			change = accs.bal(acc) - accs_before.bal(acc)
+			if change != 0:
+				l = display_width -12*(1 if verbose else 0) -2 -len(c.expl()) -2 -7 -1 -7
+				if c.cmt:
+					cmt = c.cmt
+					cl = len(cmt)
+					if cl + 2 > l:
+						cmt = cmt[:l-2]
+						cl = len(cmt)
+					if len(cmt) > 0 and sys.stdout.isatty():
+						cmt = '[\033[34m%s\033[0m]' % cmt
+					elif len(c.cmt) > 0:
+						cmt = '[%s]' % cmt
+
+					l -= 2 + cl
+				else:
+					cmt = ''
+
+				if verbose:
+					print '%s ' % c.date,
+
+				print '%s  %s %s %s %s' % (c.expl(), cmt, ' ' * l, num_fmt(change, True), num_fmt(accs.bal(acc)))
+		except Exception:
+			pass
+
+		accs_before = copy.deepcopy(accs)
+
+	print '-' * display_width
+	if verbose:
+		print ' ' * 11,
+	print 'current balance%s%s' % (' ' * (display_width - 22 -12*(1 if verbose else 0)), num_fmt(accs.bal(acc)))
+
+def cmd_balances(parser, verbose = False):
+	accs = Accounts()
+	
+	for c in parser:
+		c.appl(accs)
+
+	vlist = list(accs.listv())
+	sep = '-------------------------' + ('--' + '-' * max(len(vlist), 3) if verbose else '')
+	pad = ' ' * (2 + max(len(vlist), 3)) if verbose else ''
+
+	print '%sAccounts as of %s' % (pad, str(datetime.date.today()))
+	print sep
+	v = False
+	for a in accs.list():
+		if accs.is_virtual(a):
+			if not v:
+				print
+			v = True
+			s = '*'
+		else:
+			s = ''
+		s += ' ' + '.' * (13 - len(a+s))
+		if verbose:
+			if accs.is_virtual(a):
+				print ' %s<%c>' % (' ' * max(0, len(vlist) - 3), chr(ord('A')+vlist.index(a))),
+			else:
+				sys.stdout.write(' ' + ' ' * max(0, 3 - len(vlist)))
+				for i, name in enumerate(vlist):
+					if name in accs.listv(a):
+						sys.stdout.write(chr(ord('A') + i))
+					else:
+						sys.stdout.write(' ')
+				sys.stdout.write(' ')
+		print '%s%s EUR' % (a+s, num_fmt(accs.bal(a), False, True))
+	print sep
+
+
+def cmd_trans(parser, range_spec):
+	accs = [Accounts()]
+	log = ['']
+
+	for c in parser:
+		accs.append(copy.deepcopy(accs[-1]))
+		c.appl(accs[-1])
+
+		if c.cmt:
+			log.append(c.cmt)
+		else:
+			log.append('<' + c.fmt() + '>')
+
+	if range_spec[1]:
+		accs = accs[range_spec[0]:range_spec[1]]
+		log = log[range_spec[0]:range_spec[1]]
+	else:
+		accs = accs[range_spec[0]:]
+		log = log[range_spec[0]:]
+
+	names = prune_unchanged(accs)
+
+	print 'account     before',
+	for i in range(len(accs)-1):
+		print '%7s' % ('(' + str(i+1) + ')'),
+	print '  after'
+	print '-' * (26 + (len(accs)-1)*8)
+	
+	display_trans(accs, names)
+
+	print
+	print 'key:'
+	for i in range(1,len(accs)):
+		print ' (%d) %s' % (i, log[i])
+	print '-' * (26 + (len(accs)-1)*8)
+
+def cmd_log(parser, verbose):
+	color = sys.stdout.isatty()
+	for c in parser:
+		if verbose:
+			print c.date,
+		print c.fmt(color)
+
+def cmd_virt(parser):
+	accs = Accounts()
+	for c in parser:
+		c.appl(accs)
+
+	for name in accs.list():
+		if accs.is_virtual(name):
+			print '%s*:' % name
+			print ' ',
+			for a in accs.find(name)[2]:
+				print '%s' % a,
 			print
 
-def update_vaccs():
-	for acc in vaccs:
-		balances[acc] = sum(map(lambda x: balances[x], vaccs[acc]))
-
-
 def usage():
-	print 'usage: %s SUBCOMMAND ...' % sys.argv[0]
+	print 'usage: %s SUBCOMMAND ... [-v]' % sys.argv[0]
 	print '  subcommands:'
+	print '    syntax         show transaction syntax help'
+	print '    log            show complete transaction log'
+	print '    virt           show virtual accounts'
 	print '    bal            show current balances for all accounts'
 	print '    acc NAME       show transactions on account NAME'
 	print '    trans [NUM]    show last NUM (default: 1) transactions'
 	sys.exit(-1)
 
+def syntax_help():
+	print 'crt ACC'
+	print '  create new account named ACC'
+	print
+	print 'vcr ACC A1 .. An'
+	print '  create new virtual account consisting of A1 .. An'
+	print
+	print 'vad VACC ACC'
+	print '  add ACC to virtual account VACC'
+	print
+	print 'cls ACC'
+	print '  close account ACC'
+	print
+	print 'dep ACC AMT'
+	print '  deposit AMT into ACC'
+	print
+	print 'wth ACC AMT'
+	print '  withdraw AMT from ACC'
+	print
+	print 'xfr SRC DST AMT'
+	print '  transfer AMT from SRC to DST'
+	print
+	print 'gxto ACC A1 V1 .. An Vn'
+	print '  for i=1..n transfer Vi from Ai to ACC'
+	print
+	print 'gxfr ACC A1 V1 .. An Vn'
+	print '  for i=1..n transfer Vi from ACC to Ai'
 
-if sys.argv[-1] == '-v':
-	f = subprocess.Popen(['svn', 'annotate', '-v', 'transactions.txt'], stdout=subprocess.PIPE).stdout
-else:
-	f = file('transactions.txt', 'r')
 
-balances = {}
-order = []
-vaccs = {}
-
-if len(sys.argv) < 2 or sys.argv[1] not in ('bal', 'acc', 'trans'):
+if len(sys.argv) < 2 or sys.argv[1] not in ('bal', 'acc', 'trans', 'log', 'virt', 'syntax'):
 	usage()
 
 subcmd = sys.argv[1]
+
+if sys.argv[-1] == '-v' and subcmd in ('acc', 'log'):
+	f = subprocess.Popen(['svn', 'annotate', '-v', 'transactions.txt'], stdout=subprocess.PIPE).stdout
+	parser = parser(f, True)
+else:
+	f = file('transactions.txt', 'r')
+	parser = parser(f)
+
 
 if subcmd == 'acc' and len(sys.argv) < 3:
 	usage()
 elif subcmd == 'acc':
 	account = sys.argv[2]
-	balances_before = {}
 
 if subcmd == 'trans' and len(sys.argv) > 2:
-	num = int(sys.argv[2]) + 1
+	range_spec = range_spec_parse(sys.argv[2])
 else:
-	num = 2
-
-log_bal = [None] * num
-log_cmt = [None] * num
-log_bal[0] = copy.copy(balances)
-log_idx = 1
-
-for line in f:
-	if sys.argv[-1] == '-v':
-		date = line[18:28]
-		line = line[63:]
-
-	parts = line.strip().split(' ')
-	if parts[0] == '#' or parts[0] == '':
-		continue
-
-	comment = ''
-	expl = ''
-
-	for i, v in enumerate(parts):
-		if len(v) > 0 and v[0] == '#':
-			if parts[i+1] == 'old':
-				date = parts[i+2]
-				i += 3
-			comment = ' '.join(parts[i+1:])
-			parts = parts[0:i]
-			break
-
-	parts = filter(lambda x: len(x) > 0, parts)
-
-	if parts[0] == 'crt':
-		balances[parts[1]] = 0
-		order.append(parts[1])
-		continue
-
-	elif parts[0] == 'vcr':
-		balances[parts[1]] = 0
-		order.append(parts[1])
-		vaccs[parts[1]] = parts[2:]
-		expl = 'create virtual account'
-
-	elif parts[0] == 'vad':
-		vaccs[parts[1]].append(parts[2])
-		expl = 'add %s to virtual account' % parts[2]
-
-	elif parts[0] == 'cls':
-		acc = parts[1]
-		if not balances[acc] == 0 and not acc in vaccs:
-			raise Exception('cannot close account ' + acc + ': non-zero balance')
-		elif subcmd == 'bal':
-			del balances[acc]
-			order.remove(acc)
-			for v in vaccs:
-				if acc in vaccs[v]:
-					vaccs[v].remove(acc)
-			
-		continue
-	
-	elif parts[0] == 'dep':
-		acc = parts[1]
-		amt = parse(parts[2])
-		mod_acc(acc, amt)
-		expl = 'deposition into %s' % acc
-
-	elif parts[0] == 'wth':
-		acc = parts[1]
-		amt = parse(parts[2])
-		mod_acc(acc, -amt)
-		expl = 'withdrawal from %s' % acc
-
-	elif parts[0] == 'xfr':
-		from_acc = parts[1]
-		to_acc = parts[2]
-		amt = parse(parts[3])
-
-		mod_acc(from_acc, -amt)
-		mod_acc(to_acc, amt)
-		expl = 'transfer from %s to %s' % (from_acc, to_acc)
-
-	elif parts[0] == 'gxto' or parts[0] == 'gxfr':
-		s = 1 if parts[0] == 'gxto' else -1
-		target_acc = parts[1]
-		if is_number(parts[2]):
-			accs = parts[3:]
-			amt = int(math.ceil(float(parse(parts[2])) / len(accs)))
-			for a in accs:
-				mod_acc(target_acc, amt * s)
-				mod_acc(a, -amt * s)
-		else:
-			accamts = iter(parts[2:])
-			for acc in accamts:
-				amt = parse(accamts.next())
-				mod_acc(target_acc, amt * s)
-				mod_acc(acc, -amt * s)
-		expl = 'compound transfer'
-
-	else:
-		raise Exception('unknown command: ' + parts[0])
-		
-	update_vaccs()
-
-	log_bal[log_idx] = copy.copy(balances)
-	log_cmt[log_idx] = comment
-	log_idx = (log_idx + 1) % num
-
-	if subcmd == 'acc':
-		if account in balances:
-			if account in balances_before:
-				change = balances[account] - balances_before[account]
-			else:
-				change = balances[account]
-			if change != 0:
-				if len(comment) > 0 and sys.stdout.isatty():
-					comment = '[\033[34m%s\033[0m]' % comment
-				elif len(comment) > 0:
-					comment = '[%s]' % comment
-
-				if sys.argv[-1] == '-v':
-					print '%s ' % date,
-				print '%s  %s  %s' % (fmt(change), expl, comment)
-			
-		balances_before = copy.copy(balances)
-
+	range_spec = (-2,None)
 
 
 if subcmd == 'trans':
-	order = prune_unchanged()
-
-	print 'account     before',
-	for i in range(num-1):
-		print '%7s' % ('(' + str(i+1) + ')'),
-	print '  after'
-	print '-' * (26 + (num-1)*8)
-
-	display_trans()
-
-	print
-	print 'key:'
-	for i in range(num-1):
-		cmt = log_cmt[(log_idx + i + 1) % num]
-		if cmt:
-			print ' (%d) %s' % (i+1, cmt)
+	cmd_trans(parser, range_spec)
 elif subcmd == 'bal':
-	print 'Account balances as of ' + str(datetime.date.today())
-	print '---------------------------------'
-	display_balances()
-	print '---------------------------------'
+	cmd_balances(parser, sys.argv[-1] == '-v')
 elif subcmd == 'acc':
-	print '-' * 60
-	if sys.argv[-1] == '-v':
-		print ' ' * 11,
-	print '%s  current balance' % fmt(balances[account])
+	cmd_acc(parser, account, sys.argv[-1] == '-v')
+elif subcmd == 'log':
+	cmd_log(parser, sys.argv[-1] == '-v')
+elif subcmd == 'virt':
+	cmd_virt(parser)
+elif subcmd == 'syntax':
+	syntax_help()
