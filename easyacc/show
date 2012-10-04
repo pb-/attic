@@ -223,9 +223,9 @@ class GroupTransferCommand(Command):
 		s = 1 if self.cmd == 'gxto' else -1
 		target_acc = self.args[0]
 		if num_test(self.args[1]):
-			accs = self.args[2:]
-			amt = int(math.ceil(float(num_parse(self.args[1])) / len(accs)))
-			for a in accs:
+			accts = self.args[2:]
+			amt = int(math.ceil(float(num_parse(self.args[1])) / len(accts)))
+			for a in accts:
 				accs.mod(target_acc, s*amt)
 				accs.mod(a, -s*amt)
 		else:
