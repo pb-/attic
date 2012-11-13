@@ -75,7 +75,7 @@ class Accounts(object):
 		self.accs = []
 
 	def add(self, name):
-		a = [name, False, 0]
+		a = [name, False, 0, 0]
 		for i in range(len(self.accs)):
 			if self.accs[i][1]:
 				self.accs.insert(i, a)
@@ -98,7 +98,7 @@ class Accounts(object):
 		if self.accs[i][1]:
 			self.accs.pop(i)
 		else:
-			if self.accs[i][2] != 0:
+			if self.bal(name) != 0:
 				raise Exception('cannot close account "%s" due to non-zero balance' % name)
 			else:
 				self.accs.pop(i)
@@ -119,14 +119,32 @@ class Accounts(object):
 		a = self.find(name)
 		if a[1]:
 			raise Exception('illegal modification of virtual account "%s"' % name)
-		a[2] += amt
+
+		if amt > 0:
+			a[2] += amt
+		else:
+			a[3] += -amt
 
 	def bal(self, name):
 		a = self.find(name)
 		if a[1]:
 			return sum(map(lambda x: self.bal(x), a[2]))
 		else:
+			return a[2] - a[3]
+
+	def sdep(self, name):
+		a = self.find(name)
+		if a[1]:
+			return sum(map(lambda x: self.sdep(x), a[2]))
+		else:
 			return a[2]
+	
+	def swth(self, name):
+		a = self.find(name)
+		if a[1]:
+			return sum(map(lambda x: self.swth(x), a[2]))
+		else:
+			return a[3]
 
 	def list(self):
 		for a in self.accs:
@@ -411,7 +429,7 @@ def cmd_acc(parser, acc, verbose = False):
 	print '-' * display_width
 	if verbose:
 		print ' ' * 11,
-	print 'current balance%s%s' % (' ' * (display_width - 22 -12*(1 if verbose else 0)), num_fmt(accs.bal(acc)))
+	print 'current balance%s%s%s%s' % (' ' * (display_width - 22 -12*(1 if verbose else 0)), num_fmt(accs.sdep(acc)), num_fmt(accs.swth(acc)), num_fmt(accs.bal(acc)))
 
 def cmd_balances(parser, verbose = False):
 	accs = Accounts()
