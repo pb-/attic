@@ -1,0 +1,47 @@
+body {
+	width: 900px;
+	margin: auto;
+
+	font-family: sans-serif;
+}
+
+#map {
+	width: 500px;
+	height: 400px;
+	float: right;
+	border: 1px solid black;
+}
+
+#meta {
+	float: left;
+	width: 20em;
+}
+
+#meta tr td:first-child {
+	font-weight: bold;
+}
+
+#graphs {
+	padding-top: 3em;
+	clear: both;
+	list-style: none;
+}
+
+#graphs li h3 {
+	font-size: 90%;
+	text-align: center;
+	padding: 0;
+	margin: 5px;
+}
+
+#graphs li img {
+	cursor: crosshair;
+}
+
+hr {
+	clear: both;
+	border: none;
+	height: 1px;
+	background-color: #666;
+	color: #666;
+}
